@@ -9,8 +9,25 @@
 #include <iostream>
 #include <numbers>
 
+
 namespace RoomCReconstruction {
 
+    constexpr std::size_t CLUSTER_CONTOUR_K_SAMPLES = 120;
+
+    class ClusterContour {
+    public:
+        std::vector <size_t> contourPoints;
+
+
+        void addContourPoint(size_t pointIndex) {
+            // Make sure we don't add the same point twice in a row s.t. we can create a discrete curve with the points later on.
+            if (contourPoints.size() == 0 || (contourPoints[contourPoints.size() - 1] != pointIndex && contourPoints[0] != pointIndex)) {
+                contourPoints.push_back(pointIndex);
+            }
+        }
+
+
+    };
 
     class Cluster {
     public:
@@ -22,7 +39,12 @@ namespace RoomCReconstruction {
 
         std::vector <size_t> points;
 
-        Cluster() {
+        ClusterContour contour;
+        double max_distance;
+
+        const Eigen::Matrix<double, 3, Eigen::Dynamic> &loaded_points;
+
+        Cluster(const Eigen::Matrix<double, 3, Eigen::Dynamic> &myPointsParam) : loaded_points(myPointsParam) {
             color[0] = rand() % 256;
             color[1] = rand() % 256;
             color[2] = rand() % 256;
@@ -69,7 +91,87 @@ namespace RoomCReconstruction {
 
         }
 
-        bool rayIntersect(Eigen::Vector3d rayOrigin, Eigen::Vector3d rayDirection, double furtestDist) {
+
+        /**
+         * Calculates angle between vec1 and vec2
+         */
+        double calcAngle(Eigen::Vector3d vec1, Eigen::Vector3d vec2) {
+            return acos(vec1.dot(vec2) / (vec1.norm() * vec2.norm()));
+        }
+
+        double calculateMaxDistance() {
+            max_distance = 0;
+            for (int i = 0; i < points.size(); i++) {
+                double dist = calcDistance(loaded_points.col(static_cast<Eigen::Index>(points[i])), center);
+                if (dist > max_distance) { max_distance = dist; }
+            }
+            return max_distance;
+        }
+        double calculateClusterContour() {
+
+
+
+
+
+            Eigen::Vector3d perpendicular_vec = calcPerpendicular(normal);
+            for (int i = 0; i < CLUSTER_CONTOUR_K_SAMPLES; i++ ) {
+                double rotation_in_radians = 2*std::numbers::pi_v<double> * (i / static_cast<double>(CLUSTER_CONTOUR_K_SAMPLES));
+                Eigen::AngleAxis<double> rotationMatrix(rotation_in_radians, normal);
+
+                Eigen::Vector3d scan_direction = rotationMatrix * perpendicular_vec;
+
+                // Get the furthest point away from center w.r.t. the "scan_direction".
+                double maxdistance = 0;
+                int furthestPoint = -1;
+                for (int i = 0; i < points.size(); i++) {
+                    Eigen::Vector3d currentPoint = loaded_points.col(static_cast<Eigen::Index>(points[i]));
+                    double point_angle_wrt_scandir = calcAngle(currentPoint - center, scan_direction);
+                    if (point_angle_wrt_scandir < 2*std::numbers::pi_v<double> / static_cast<double>(CLUSTER_CONTOUR_K_SAMPLES)) {
+                        double dist = calcDistance(center, currentPoint);
+                        if (dist > maxdistance) { maxdistance = dist; furthestPoint = i; }
+                    }
+                }
+                if (furthestPoint != -1) {
+                    contour.addContourPoint(furthestPoint);
+                }
+            }
+
+
+
+
+            /*std::cout << "vector: ";
+            printVec(perpendicular_vec);
+            std::cout << " gets transformed to: ";
+            printVec(rotationMatrix * perpendicular_vec);
+            std::cout << "\n";*/
+
+            return contour.contourPoints.size();
+        }
+
+        /**
+         *  Calculates absolute Distance from vec1 to vec2. Order doesn't matter
+         */
+        double calcDistance(Eigen::Vector3d vec1, Eigen::Vector3d vec2) {
+            return (vec2 - vec1).norm();
+        }
+        double calculateClosestDistanceToCluster(Eigen::Vector3d vec) {
+            double mindistance = std::numeric_limits<double>::max();
+            for (int i = 0; i < points.size(); i++) {
+                double dist = calcDistance(loaded_points.col(static_cast<Eigen::Index>(points[i])), center);
+                if (dist < mindistance) { mindistance = dist; }
+            }
+            return mindistance;
+        }
+
+        Eigen::Vector3d calcPerpendicular(Eigen::Vector3d vec) {
+            return std::abs(vec[2]) < std::abs(vec[0]) ? Eigen::Vector3d(vec.y(), -vec.x(), 0) : Eigen::Vector3d(0, -vec.z(), vec.y());
+        }
+
+
+
+
+
+        /*bool rayIntersect(Eigen::Vector3d rayOrigin, Eigen::Vector3d rayDirection, double furtestDist) {
             std::cout << "does: " << "[" << rayOrigin.x() << "," << rayOrigin.y() << ","
                       << rayOrigin.z() << "]" << ", " << "[" << rayDirection.x() << "," << rayDirection.y() << ","
                       << rayDirection.z() << "]" << " intersect with " << "[" << center.x() << "," << center.y() << ","
@@ -82,10 +184,12 @@ namespace RoomCReconstruction {
 
             std::cout << distance << "\n\n";
             return (distance > 0 && distance < furtestDist) ? true : false;
-        }
-
+        }*/
 
     };
+
+
+    void printMyVec(Eigen::Vector3d vec);
 
     /*void printV(Eigen::Vector3d vec) {
         std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";

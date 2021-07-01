@@ -45,7 +45,7 @@ namespace RoomCReconstruction {
                 local_pcas.size(), std::array < unsigned char, 3 > {0});
 
 
-        std::vector <Cluster> clusters(0);
+        std::vector <Cluster> clusters;
 
         // For all points
         for (int i = 0; i != local_pcas.size(); ++i) {
@@ -71,7 +71,7 @@ namespace RoomCReconstruction {
                 }
             }
             if (!found) {
-                Cluster newCluster;
+                Cluster newCluster{points};
                 newCluster.normal = local_pcas[i].local_base.col(2);
                 newCluster.center = points.col(static_cast<Eigen::Index>(i));
                 clusters.push_back(newCluster);
@@ -81,27 +81,26 @@ namespace RoomCReconstruction {
 
         std::cout << clusters.size() << "\n";
 
+        for (int i = 0; i < clusters.size(); i++) {
+            std::cout << "Cluster " << i << ": #contourpoints=";
+            std::cout << clusters[i].calculateClusterContour() << ", max_dist: ";
+            std::cout << clusters[i].calculateMaxDistance() << "\n\n";
 
-        for (int k = 0; k < clusters[3].points.size(); k++) {
-            colors[clusters[3].points[k]] = colorRed;
+            /*for(size_t num : clusters[i].contour.contourPoints) {
+                colors[num] = colorRed;
+            }*/
         }
 
 
 
+        /*for(size_t num : clusters[0].contour.contourPoints) {
+            colors[clusters[0].points[num]] = colorRed;
+        }*/
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+        /*for (int k = 0; k < clusters[0].points.size(); k++) {
+            colors[clusters[0].points[k]] = colorRed;
+        }*/
 
 
 
@@ -163,5 +162,12 @@ namespace RoomCReconstruction {
 
         TangentSpace::IO::write3DPointsWithColors("hello1234.ply", points, colors);
 
+    }
+
+
+
+
+    void printMyVec(Eigen::Vector3d vec) {
+      std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
     }
 }
