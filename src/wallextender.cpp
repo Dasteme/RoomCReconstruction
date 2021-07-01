@@ -75,14 +75,14 @@ namespace RoomCReconstruction {
                 newCluster.normal = local_pcas[i].local_base.col(2);
                 newCluster.center = points.col(static_cast<Eigen::Index>(i));
                 clusters.push_back(newCluster);
-                //i--;   Should make that we process the same point again s.t. we can add it to the new cluster. Somehow it doesn't work and creates an infinite loop, suggesting that something above doesn't work as it should.
+                i--;   //Makes that we process the same point again s.t. we can add it to the new cluster.
             }
         }
 
         std::cout << clusters.size() << "\n";
 
         for (int i = 0; i < clusters.size(); i++) {
-            std::cout << "Cluster " << i << ": #contourpoints=";
+            std::cout << "Cluster " << i << ": #points: " << clusters[i].points.size() << ", #contourpoints=";
             std::cout << clusters[i].calculateClusterContour() << ", max_dist: ";
             std::cout << clusters[i].calculateMaxDistance() << "\n\n";
 

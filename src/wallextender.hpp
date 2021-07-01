@@ -54,7 +54,7 @@ namespace RoomCReconstruction {
         bool checkAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex) {
             double distance = (point - center).dot(normal);
             double gaussian_distance = gaussian_1d(distance, 1.0, 0.0, 4);
-            double angle = acos(normal.dot(pointNormal) / (normal.norm() * pointNormal.norm()));
+            double angle = safe_acos(normal.dot(pointNormal) / (normal.norm() * pointNormal.norm()));
             double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 4);
 
             /*if (distance2 < 6 && distance2 > 3) {
@@ -70,6 +70,16 @@ namespace RoomCReconstruction {
                 return true;
             }
             return false;
+        }
+
+        double safe_acos(double value) {
+          if (value <= -1) {
+            return std::numbers::pi_v<double>;
+          } else if(value >= 1) {
+            return 0;
+          } else {
+            return acos(value);
+          }
         }
 
         double gaussian_1d(const double x, const double A, const double x0, const double sigma_x) {
