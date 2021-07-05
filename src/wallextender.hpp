@@ -38,13 +38,13 @@ namespace RoomCReconstruction {
         std::array<unsigned char, 3> color;
 
         std::vector <size_t> points;
+        std::vector <Eigen::Vector3d> pointsReal;
 
         ClusterContour contour;
         double max_distance;
 
-        const Eigen::Matrix<double, 3, Eigen::Dynamic> &loaded_points;
 
-        Cluster(const Eigen::Matrix<double, 3, Eigen::Dynamic> &myPointsParam) : loaded_points(myPointsParam) {
+        Cluster() {
             color[0] = rand() % 256;
             color[1] = rand() % 256;
             color[2] = rand() % 256;
@@ -63,6 +63,7 @@ namespace RoomCReconstruction {
 
             if (gaussian_distance > 0.8 && gaussian_angle > 0.7) {
                 points.push_back(pointIndex);
+                pointsReal.push_back(point);
                 updateCenter(point);
                 updateNormal(pointNormal);
 
@@ -101,6 +102,9 @@ namespace RoomCReconstruction {
 
         }
 
+        double getPlaneD() {
+          return normal.dot(center);
+        }
 
         /**
          * Calculates angle between vec1 and vec2
@@ -112,7 +116,7 @@ namespace RoomCReconstruction {
         double calculateMaxDistance() {
             max_distance = 0;
             for (int i = 0; i < points.size(); i++) {
-                double dist = calcDistance(loaded_points.col(static_cast<Eigen::Index>(points[i])), center);
+                double dist = calcDistance(pointsReal[i]);
                 if (dist > max_distance) { max_distance = dist; }
             }
             return max_distance;
@@ -134,10 +138,10 @@ namespace RoomCReconstruction {
                 double maxdistance = 0;
                 int furthestPoint = -1;
                 for (int i = 0; i < points.size(); i++) {
-                    Eigen::Vector3d currentPoint = loaded_points.col(static_cast<Eigen::Index>(points[i]));
+                    Eigen::Vector3d currentPoint = pointsReal[i];
                     double point_angle_wrt_scandir = calcAngle(currentPoint - center, scan_direction);
                     if (point_angle_wrt_scandir < 2*std::numbers::pi_v<double> / static_cast<double>(CLUSTER_CONTOUR_K_SAMPLES)) {
-                        double dist = calcDistance(center, currentPoint);
+                        double dist = calcDistance(currentPoint);
                         if (dist > maxdistance) { maxdistance = dist; furthestPoint = i; }
                     }
                 }
@@ -161,13 +165,13 @@ namespace RoomCReconstruction {
         /**
          *  Calculates absolute Distance from vec1 to vec2. Order doesn't matter
          */
-        double calcDistance(Eigen::Vector3d vec1, Eigen::Vector3d vec2) {
-            return (vec2 - vec1).norm();
+        double calcDistance(Eigen::Vector3d vec1) {
+            return (center - vec1).norm();
         }
         double calculateClosestDistanceToCluster(Eigen::Vector3d vec) {
             double mindistance = std::numeric_limits<double>::max();
             for (int i = 0; i < points.size(); i++) {
-                double dist = calcDistance(loaded_points.col(static_cast<Eigen::Index>(points[i])), center);
+                double dist = calcDistance(pointsReal[i]);
                 if (dist < mindistance) { mindistance = dist; }
             }
             return mindistance;
@@ -204,6 +208,9 @@ namespace RoomCReconstruction {
     /*void printV(Eigen::Vector3d vec) {
         std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
     }*/
+
+
+    bool intersect3Clusters(Cluster cluster1, Cluster cluster2, Cluster cluster3, Eigen::Vector3d& resultPoint);
 
     void
     extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,

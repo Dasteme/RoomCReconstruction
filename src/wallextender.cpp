@@ -71,7 +71,7 @@ namespace RoomCReconstruction {
                 }
             }
             if (!found) {
-                Cluster newCluster{points};
+                Cluster newCluster;
                 newCluster.normal = local_pcas[i].local_base.col(2);
                 newCluster.center = points.col(static_cast<Eigen::Index>(i));
                 clusters.push_back(newCluster);
@@ -91,6 +91,13 @@ namespace RoomCReconstruction {
             }*/
         }
 
+        // Remove small clusters
+        for (auto it = clusters.begin(); it != clusters.end(); it++) {
+          if ((*it).points.size() < 500) {
+            clusters.erase(it--);
+          }
+        }
+
 
 
         /*for(size_t num : clusters[0].contour.contourPoints) {
@@ -105,6 +112,38 @@ namespace RoomCReconstruction {
 
 
 
+        Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(3, 0);
+
+        for (int i = 0; i < clusters.size(); i++) {
+          for (int j = i + 1; j < clusters.size(); j++) {
+            for (int k = j + 1; k < clusters.size(); k++) {
+              Eigen::Vector3d resultpoint;
+              if (RoomCReconstruction::intersect3Clusters(
+                clusters[i], clusters[j], clusters[k], resultpoint)) {
+                double dc1 = clusters[i].calcDistance(resultpoint);
+                double dc2 = clusters[j].calcDistance(resultpoint);
+                double dc3 = clusters[k].calcDistance(resultpoint);
+
+                if ((clusters[i].max_distance + 5 - dc1) >= 0 &&
+                    (clusters[j].max_distance + 5 - dc2) >= 0 &&
+                    (clusters[k].max_distance + 5 - dc3) >= 0) {
+
+                  std::cout << "found intersection between: " << i << "," << j << "," << k << ", " << "point: ";
+                  printMyVec(resultpoint);
+                  std::cout << "\n";
+
+                  intersectPoints.conservativeResize(intersectPoints.rows(), intersectPoints.cols()+1);
+                  intersectPoints.col(intersectPoints.cols()-1) = resultpoint;
+                  Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(intersectPoints.rows(), intersectPoints.cols() + 1);
+                  colors.push_back(colorRed);
+                }
+              }
+            }
+          }
+        }
+
+        Eigen::Matrix<double, 3, Eigen::Dynamic> printMat(points.rows(), points.cols() + intersectPoints.cols());
+        printMat << points, intersectPoints;
 
 
 
@@ -160,12 +199,25 @@ namespace RoomCReconstruction {
             }
         }*/
 
-        TangentSpace::IO::write3DPointsWithColors("hello1234.ply", points, colors);
+        TangentSpace::IO::write3DPointsWithColors("output_clustering.ply", printMat, colors);
 
     }
 
 
+    // Returns true if worked
+    bool
+    intersect3Clusters(Cluster c1, Cluster c2, Cluster c3, Eigen::Vector3d& resultPoint)
+    {
+      Eigen::Vector3d u = c2.normal.cross(c3.normal);
+      float denom = c1.normal.dot(u);
+      if (std::abs(denom) < FLT_EPSILON)
+        return false;
 
+      resultPoint = (c1.getPlaneD() * u +
+                     c1.normal.cross(c3.getPlaneD() * c2.normal - c2.getPlaneD() * c3.normal)) /
+                    denom;
+      return true;
+    }
 
     void printMyVec(Eigen::Vector3d vec) {
       std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
