@@ -4,7 +4,6 @@
 
 #include "wallextender.hpp"
 
-
 #include "ts/pc/pc_io.hpp"
 
 #include <cmath>
@@ -120,14 +119,25 @@ namespace RoomCReconstruction {
               Eigen::Vector3d resultpoint;
               if (RoomCReconstruction::intersect3Clusters(
                 clusters[i], clusters[j], clusters[k], resultpoint)) {
-                double dc1 = clusters[i].calcDistance(resultpoint);
-                double dc2 = clusters[j].calcDistance(resultpoint);
-                double dc3 = clusters[k].calcDistance(resultpoint);
+                double dc1 = clusters[i].calcDistanceToCenter(resultpoint);
+                double dc2 = clusters[j].calcDistanceToCenter(resultpoint);
+                double dc3 = clusters[k].calcDistanceToCenter(resultpoint);
 
-                if ((clusters[i].max_distance + 5 - dc1) >= 0 &&
-                    (clusters[j].max_distance + 5 - dc2) >= 0 &&
-                    (clusters[k].max_distance + 5 - dc3) >= 0) {
+                double cdc1 = clusters[i].calculateClosestDistanceToCluster(resultpoint);
+                double cdc2 = clusters[j].calculateClosestDistanceToCluster(resultpoint);
+                double cdc3 = clusters[k].calculateClosestDistanceToCluster(resultpoint);
 
+
+                if (cdc1 <= 10 &&
+                    cdc2 <= 10 &&
+                    cdc3 <= 10) {
+
+                  clusters[i].intersectionsPoints.push_back(resultpoint);
+                  clusters[j].intersectionsPoints.push_back(resultpoint);
+                  clusters[k].intersectionsPoints.push_back(resultpoint);
+
+
+                  std::cout << "Clostest distances: " << cdc1 << ", " << cdc2 << ", " << cdc3;
                   std::cout << "found intersection between: " << i << "," << j << "," << k << ", " << "point: ";
                   printMyVec(resultpoint);
                   std::cout << "\n";
@@ -146,6 +156,11 @@ namespace RoomCReconstruction {
         printMat << points, intersectPoints;
 
 
+        for (int i = 0; i < clusters.size(); i++) {
+          if (clusters[i].intersectionsPoints.size() == 4) {
+
+          }
+        }
 
         // ***
         // Delete "furniture"-clusters like chairs.
@@ -199,8 +214,32 @@ namespace RoomCReconstruction {
             }
         }*/
 
+
+
+
         TangentSpace::IO::write3DPointsWithColors("output_clustering.ply", printMat, colors);
 
+
+        // For every cluster that has at least 4 intersection-points, take the first 4 intersection-points and create a plane
+        std::vector< std::vector <Eigen::Vector3d>> realpoints;
+        for (int i = 0; i < clusters.size(); i++) {
+            if (clusters[i].intersectionsPoints.size() < 4) continue;
+          realpoints.emplace_back(clusters[i].intersectionsPoints);
+        }
+
+        RoomCReconstruction::IO::createPlanarRoom("interpolation_method.ply", realpoints);
+
+
+
+
+
+        // Method 2: Planify every cluster - Transform clusters into planes
+      std::vector<std::vector <Eigen::Vector3d>> filledRectanglesResult;
+      for (int i = 0; i < clusters.size(); i++) {
+        planifyCluster(clusters[i], filledRectanglesResult);
+      }
+
+      RoomCReconstruction::IO::createPlanarRoom("planification_method.ply", filledRectanglesResult);
     }
 
 
@@ -221,5 +260,87 @@ namespace RoomCReconstruction {
 
     void printMyVec(Eigen::Vector3d vec) {
       std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
+    }
+
+    Eigen::Vector3d calcPerpendicular(Eigen::Vector3d vec) {
+      return std::abs(vec[2]) < std::abs(vec[0]) ? Eigen::Vector3d(vec.y(), -vec.x(), 0) : Eigen::Vector3d(0, -vec.z(), vec.y());
+    }
+
+
+    void planifyCluster(Cluster cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles) {
+
+      std::vector<Eigen::Vector2d> cluster02dpoints = transformPlanePointsTo2D(cluster.normal, cluster.center, cluster.pointsReal);
+      RecursiveRectangle rrCluster0;
+      double xMin = std::numeric_limits<double>::max();
+      double xMax = std::numeric_limits<double>::min();
+      double yMin = std::numeric_limits<double>::max();
+      double yMax = std::numeric_limits<double>::min();
+      for (const auto &p : cluster02dpoints) {
+        if (p.x() < xMin) xMin = p.x();
+        if (p.x() > xMax) xMax = p.x();
+        if (p.y() < yMin) yMin = p.y();
+        if (p.y() > yMax) yMax = p.y();
+      }
+
+      std::vector<std::vector <Eigen::Vector2d>> filledRectangles2d;
+      rrCluster0.bounds = {xMin, yMin, xMax-xMin, yMax-yMin};
+      rrCluster0.points = cluster02dpoints;
+      rrCluster0.buildRRContent(filledRectangles2d);
+
+
+      //rrCluster0.getFilledRectangles(filledRectangles, 0);
+      std::cout << "Recursion finished\n";
+
+      std::cout << "Filled Rectangles count:" << filledRectangles2d.size();
+
+      for (const auto& rect : filledRectangles2d) {
+        filledRectangles.push_back(transform2DToPlanePoints(cluster.normal, cluster.center, rect));
+      }
+
+    }
+
+
+    std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, std::vector <Eigen::Vector3d> pointsReal) {
+      // First calculate 2 perpendicular vectors to the normal. These are required and define the axis in 2D.
+      Eigen::Vector3d a1 = calcPerpendicular(normal);
+
+      Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, normal);
+
+      Eigen::Vector3d a2 = rotationMatrix * a1;
+
+      // Check if everything is alrigth.
+      // TODO: How to do assertions like in Java?
+      if (normal.dot(a1) > 0.001) { std::cout << "transformPlanePointsTo2D error: normal dot a1"; }
+      if (normal.dot(a2) > 0.001) { std::cout << "transformPlanePointsTo2D error: normal dot a2"; }
+      if (a1.dot(a2) > 0.001) { std::cout << "transformPlanePointsTo2D error: a1 dot a2"; }
+
+      std::vector <Eigen::Vector2d> points2D;
+
+      for (int i = 0; i < pointsReal.size(); i++) {
+        points2D.emplace_back(Eigen::Vector2d{a1.dot(pointsReal[i] - center), a2.dot(pointsReal[i] - center)});
+      }
+
+      //Debug
+      //write2Dpoints("transform_3d_2d_debug.ply", points2D);
+
+      return points2D;
+    }
+
+
+    std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, std::vector <Eigen::Vector2d> points) {
+      // TODO: This only works beacuse we calculate the arbitrary perpendicular the same way. This method should take the axis as input.
+      Eigen::Vector3d a1 = calcPerpendicular(normal);
+
+      Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, normal);
+
+      Eigen::Vector3d a2 = rotationMatrix * a1;
+
+
+      std::vector <Eigen::Vector3d> points3D;
+      for (int i = 0; i < points.size(); i++) {
+        points3D.emplace_back(center + points[i].x()*a1 + points[i].y()*a2);
+      }
+
+      return points3D;
     }
 }
