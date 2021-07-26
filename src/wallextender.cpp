@@ -269,7 +269,12 @@ namespace RoomCReconstruction {
 
     void planifyCluster(Cluster cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles) {
 
-      std::vector<Eigen::Vector2d> cluster02dpoints = transformPlanePointsTo2D(cluster.normal, cluster.center, cluster.pointsReal);
+      // First calculate 2 perpendicular vectors to the normal. These are required and define the axis in 2D.
+      Eigen::Vector3d a1 = calcPerpendicular(cluster.normal);
+      Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, cluster.normal);
+      Eigen::Vector3d a2 = rotationMatrix * a1;
+
+      std::vector<Eigen::Vector2d> cluster02dpoints = transformPlanePointsTo2D(cluster.normal, cluster.center, a1, a2, cluster.pointsReal);
       RecursiveRectangle rrCluster0;
       double xMin = std::numeric_limits<double>::max();
       double xMax = std::numeric_limits<double>::min();
@@ -294,19 +299,13 @@ namespace RoomCReconstruction {
       std::cout << "Filled Rectangles count:" << filledRectangles2d.size();
 
       for (const auto& rect : filledRectangles2d) {
-        filledRectangles.push_back(transform2DToPlanePoints(cluster.normal, cluster.center, rect));
+        filledRectangles.push_back(transform2DToPlanePoints(cluster.normal, cluster.center, a1, a2, rect));
       }
 
     }
 
 
-    std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, std::vector <Eigen::Vector3d> pointsReal) {
-      // First calculate 2 perpendicular vectors to the normal. These are required and define the axis in 2D.
-      Eigen::Vector3d a1 = calcPerpendicular(normal);
-
-      Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, normal);
-
-      Eigen::Vector3d a2 = rotationMatrix * a1;
+    std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector3d> pointsReal) {
 
       // Check if everything is alrigth.
       // TODO: How to do assertions like in Java?
@@ -327,14 +326,7 @@ namespace RoomCReconstruction {
     }
 
 
-    std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, std::vector <Eigen::Vector2d> points) {
-      // TODO: This only works beacuse we calculate the arbitrary perpendicular the same way. This method should take the axis as input.
-      Eigen::Vector3d a1 = calcPerpendicular(normal);
-
-      Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, normal);
-
-      Eigen::Vector3d a2 = rotationMatrix * a1;
-
+    std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector2d> points) {
 
       std::vector <Eigen::Vector3d> points3D;
       for (int i = 0; i < points.size(); i++) {
