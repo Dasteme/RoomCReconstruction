@@ -306,12 +306,9 @@ namespace RoomCReconstruction {
 
 
     std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector3d> pointsReal) {
-
-      // Check if everything is alrigth.
-      // TODO: How to do assertions like in Java?
-      if (normal.dot(a1) > 0.001) { std::cout << "transformPlanePointsTo2D error: normal dot a1"; }
-      if (normal.dot(a2) > 0.001) { std::cout << "transformPlanePointsTo2D error: normal dot a2"; }
-      if (a1.dot(a2) > 0.001) { std::cout << "transformPlanePointsTo2D error: a1 dot a2"; }
+      assert (normal.dot(a1) > 0.001);
+      assert (normal.dot(a2) > 0.001);
+      assert (a1.dot(a2) > 0.001);
 
       std::vector <Eigen::Vector2d> points2D;
 
@@ -327,6 +324,9 @@ namespace RoomCReconstruction {
 
 
     std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector2d> points) {
+      assert (normal.dot(a1) > 0.001);
+      assert (normal.dot(a2) > 0.001);
+      assert (a1.dot(a2) > 0.001);
 
       std::vector <Eigen::Vector3d> points3D;
       for (int i = 0; i < points.size(); i++) {
