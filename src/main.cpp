@@ -75,7 +75,7 @@ int main(int argc, const char* argv[]) {
 
 
     // Clustering
-    RoomCReconstruction::extendWallpoint(search_tree, loaded_points, local_pcas);
+    RoomCReconstruction::extendWallpoint(search_tree, loaded_points, local_pcas, avg_spacing);
 
 
     std::cout << "Hello, World!" << std::endl;

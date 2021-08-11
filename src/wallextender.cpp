@@ -19,8 +19,9 @@ namespace RoomCReconstruction {
 
 
     void extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
-                         const std::vector <TangentSpace::LocalPCA> &local_pcas) {
+                         const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing) {
 
+        std::cout << "extending wallpoint";
 
         const auto gaussian_2d{[](const double x,
                                   const double y,
@@ -74,7 +75,7 @@ namespace RoomCReconstruction {
                 newCluster.normal = local_pcas[i].local_base.col(2);
                 newCluster.center = points.col(static_cast<Eigen::Index>(i));
                 clusters.push_back(newCluster);
-                i--;   //Makes that we process the same point again s.t. we can add it to the new cluster.
+                //i--;   //Makes that we process the same point again s.t. we can add it to the new cluster.
             }
         }
 
@@ -144,7 +145,7 @@ namespace RoomCReconstruction {
 
                   intersectPoints.conservativeResize(intersectPoints.rows(), intersectPoints.cols()+1);
                   intersectPoints.col(intersectPoints.cols()-1) = resultpoint;
-                  Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(intersectPoints.rows(), intersectPoints.cols() + 1);
+                  //Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(intersectPoints.rows(), intersectPoints.cols() + 1);
                   colors.push_back(colorRed);
                 }
               }
@@ -236,7 +237,7 @@ namespace RoomCReconstruction {
         // Method 2: Planify every cluster - Transform clusters into planes
       std::vector<std::vector <Eigen::Vector3d>> filledRectanglesResult;
       for (int i = 0; i < clusters.size(); i++) {
-        planifyCluster(clusters[i], filledRectanglesResult);
+        planifyCluster(clusters[i], filledRectanglesResult, avg_spacing);
       }
 
       RoomCReconstruction::IO::createPlanarRoom("planification_method.ply", filledRectanglesResult);
@@ -248,8 +249,8 @@ namespace RoomCReconstruction {
     intersect3Clusters(Cluster c1, Cluster c2, Cluster c3, Eigen::Vector3d& resultPoint)
     {
       Eigen::Vector3d u = c2.normal.cross(c3.normal);
-      float denom = c1.normal.dot(u);
-      if (std::abs(denom) < FLT_EPSILON)
+      double denom = c1.normal.dot(u);
+      if (std::abs(denom) < DBL_EPSILON)
         return false;
 
       resultPoint = (c1.getPlaneD() * u +
@@ -258,16 +259,16 @@ namespace RoomCReconstruction {
       return true;
     }
 
-    void printMyVec(Eigen::Vector3d vec) {
+    void printMyVec(const Eigen::Vector3d& vec) {
       std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
     }
 
-    Eigen::Vector3d calcPerpendicular(Eigen::Vector3d vec) {
+    Eigen::Vector3d calcPerpendicular(const Eigen::Vector3d& vec) {
       return std::abs(vec[2]) < std::abs(vec[0]) ? Eigen::Vector3d(vec.y(), -vec.x(), 0) : Eigen::Vector3d(0, -vec.z(), vec.y());
     }
 
 
-    void planifyCluster(Cluster cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles) {
+    void planifyCluster(const Cluster& cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles, const double avg_spacing) {
 
       // First calculate 2 perpendicular vectors to the normal. These are required and define the axis in 2D.
       Eigen::Vector3d a1 = calcPerpendicular(cluster.normal);
@@ -290,10 +291,10 @@ namespace RoomCReconstruction {
       std::vector<std::vector <Eigen::Vector2d>> filledRectangles2d;
       rrCluster0.bounds = {xMin, yMin, xMax-xMin, yMax-yMin};
       rrCluster0.points = cluster02dpoints;
-      rrCluster0.buildRRContent(filledRectangles2d);
+      rrCluster0.buildRRContent(avg_spacing);
 
 
-      //rrCluster0.getFilledRectangles(filledRectangles, 0);
+      rrCluster0.getFilledRectangles(filledRectangles2d, 0);
       std::cout << "Recursion finished\n";
 
       std::cout << "Filled Rectangles count:" << filledRectangles2d.size();

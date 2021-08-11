@@ -58,7 +58,7 @@ namespace RoomCReconstruction {
             double distance = (point - center).dot(normal);
             double gaussian_distance = gaussian_1d(distance, 1.0, 0.0, 4);
             double angle = safe_acos(normal.dot(pointNormal) / (normal.norm() * pointNormal.norm()));
-            double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 4);
+            double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 12);
 
             /*if (distance2 < 6 && distance2 > 3) {
                 std::cout << "Distance: " << distance2 << " becomes: " << gaussian_distance << "\n";
@@ -224,33 +224,18 @@ namespace RoomCReconstruction {
       enum fillState {notDetermined, special, notFilled, filled};
 
       std::array<double, 4> bounds;   //x, y, width, height
-      std::array<RecursiveRectangle*, 4> rrContent;
+      std::array<std::unique_ptr<RecursiveRectangle>, 4> rrContent;
       std::vector <Eigen::Vector2d> points;
       fillState fstate = fillState::notDetermined;
 
-      void buildRRContent(std::vector<std::vector <Eigen::Vector2d>>& temporary) {
+      void buildRRContent(double avg_spacing) {
         //std::cout << "Build rrContent within: " << bounds[0] << ", " << bounds[1] << ", [" << bounds[2] << ", " << bounds[3] << "]\n";
 
         // No points in cluster, 1st case to break recursion
         if (points.size() == 0) {fstate = fillState::notFilled; return; }
 
         // Points density is enough s.t. we can skip further divisions, 2nd case
-        if (points.size() / getArea() >= 7) {fstate = fillState::filled;   //TODO: Replace 7 by something related to the average spacing. Maybe (1/avg_spacing)^2 ?
-
-
-
-
-
-          std::vector<Eigen::Vector2d> cornerPoints;
-          cornerPoints.push_back(Eigen::Vector2d{ bounds[0], bounds[1]});
-          cornerPoints.push_back(Eigen::Vector2d{ bounds[0] + bounds[2], bounds[1]});
-          cornerPoints.push_back(Eigen::Vector2d{ bounds[0], bounds[1] + bounds[3]});
-          cornerPoints.push_back(Eigen::Vector2d{ bounds[0] + bounds[2], bounds[1] + bounds[3]});
-
-          temporary.push_back(cornerPoints);
-
-
-
+        if (points.size() / getArea() >= (1 / (pow(avg_spacing/2, 2) * std::numbers::pi_v<double>))) {fstate = fillState::filled;   //TODO: Replace 7 by something related to the average spacing. Maybe (1/avg_spacing)^2 ?
 
 
 
@@ -258,44 +243,40 @@ namespace RoomCReconstruction {
           return; }
 
         // Special case: Divide current Rectangle into 4 pieces.
-        RecursiveRectangle rr1;
-        RecursiveRectangle rr2;
-        RecursiveRectangle rr3;
-        RecursiveRectangle rr4;
-        rrContent[0] = &rr1;
-        rrContent[1] = &rr2;
-        rrContent[2] = &rr3;
-        rrContent[3] = &rr4;
+        rrContent[0] = std::make_unique<RecursiveRectangle>();
+        rrContent[1] = std::make_unique<RecursiveRectangle>();
+        rrContent[2] = std::make_unique<RecursiveRectangle>();
+        rrContent[3] = std::make_unique<RecursiveRectangle>();
 
-        rr1.fstate = fillState::notDetermined;
-        rr2.fstate = fillState::notDetermined;
-        rr3.fstate = fillState::notDetermined;
-        rr4.fstate = fillState::notDetermined;
+        rrContent[0]->fstate = fillState::notDetermined;
+        rrContent[1]->fstate = fillState::notDetermined;
+        rrContent[2]->fstate = fillState::notDetermined;
+        rrContent[3]->fstate = fillState::notDetermined;
 
 
 
         double wHalf = bounds[2] / 2;
         double hHalf = bounds[3] / 2;
 
-        rr1.bounds = {bounds[0], bounds[1], wHalf, hHalf};
-        rr2.bounds = {bounds[0]+wHalf, bounds[1], wHalf, hHalf};
-        rr3.bounds = {bounds[0], bounds[1]+hHalf, wHalf, hHalf};
-        rr4.bounds = {bounds[0]+wHalf, bounds[1]+hHalf, wHalf, hHalf};
+        rrContent[0]->bounds = {bounds[0], bounds[1], wHalf, hHalf};
+        rrContent[1]->bounds = {bounds[0]+wHalf, bounds[1], wHalf, hHalf};
+        rrContent[2]->bounds = {bounds[0], bounds[1]+hHalf, wHalf, hHalf};
+        rrContent[3]->bounds = {bounds[0]+wHalf, bounds[1]+hHalf, wHalf, hHalf};
 
 
         // Divide points into their respective subrectangle
         for (const auto &p : points) {
-          if (rr1.checkAndAdd(p)) continue;
-          if (rr2.checkAndAdd(p)) continue;
-          if (rr3.checkAndAdd(p)) continue;
-          if (rr4.checkAndAdd(p)) continue;
+          if (rrContent[0]->checkAndAdd(p)) continue;
+          if (rrContent[1]->checkAndAdd(p)) continue;
+          if (rrContent[2]->checkAndAdd(p)) continue;
+          if (rrContent[3]->checkAndAdd(p)) continue;
           std::cout << "error occured"; // Note: can happen due to double precision
         }
 
-        rr1.buildRRContent(temporary);
-        rr2.buildRRContent(temporary);
-        rr3.buildRRContent(temporary);
-        rr4.buildRRContent(temporary);
+        rrContent[0]->buildRRContent(avg_spacing);
+        rrContent[1]->buildRRContent(avg_spacing);
+        rrContent[2]->buildRRContent(avg_spacing);
+        rrContent[3]->buildRRContent(avg_spacing);
 
         fstate = fillState::special;
       }
@@ -312,18 +293,14 @@ namespace RoomCReconstruction {
       }
 
 
-      void getFilledRectangles(std::vector<std::vector <Eigen::Vector3d>>& collecter, int depth) {
-        std::cout << "getFilledRects, " << depth << "\n";
-        std::cout << "Looking at: " << bounds[0] << ", " << bounds[1] << ", [" << bounds[2] << ", " << bounds[3] << "]\n";
+      void getFilledRectangles(std::vector<std::vector <Eigen::Vector2d>>& collecter, int depth) {
 
-
-        if (depth > 2) {
+        if (depth > 100) {
           std::cout << "Return due to depth...\n";
           return;
         }
 
         if (fstate == fillState::filled) {
-          std::cout << "We got a FILLED Rectangle!\n";
           /*std::vector<Eigen::Vector3d> cornerPoints;
           cornerPoints.push_back(Eigen::Vector3d{ bounds[0], bounds[1], 0 });
           cornerPoints.push_back(Eigen::Vector3d{ bounds[0] + bounds[2], bounds[1], 0 });
@@ -332,12 +309,20 @@ namespace RoomCReconstruction {
 
           collecter.push_back(cornerPoints);
           std::cout << "New SIZE: " << collecter.size() << "\n";*/
+
+          std::vector<Eigen::Vector2d> cornerPoints;
+          cornerPoints.push_back(Eigen::Vector2d{ bounds[0], bounds[1]});
+          cornerPoints.push_back(Eigen::Vector2d{ bounds[0] + bounds[2], bounds[1]});
+          cornerPoints.push_back(Eigen::Vector2d{ bounds[0], bounds[1] + bounds[3]});
+          cornerPoints.push_back(Eigen::Vector2d{ bounds[0] + bounds[2], bounds[1] + bounds[3]});
+
+          collecter.push_back(cornerPoints);
+
+
           return;
         } else if (fstate == fillState::notFilled) {
-          std::cout << "We got an EMPTY Rectangle!\n";
           return;
         } else if (fstate == fillState::special) {
-          std::cout << fstate << "We got a SPECIAL Rectangle!\n";
           rrContent[0]->getFilledRectangles(collecter, depth+1);
           rrContent[1]->getFilledRectangles(collecter, depth+1);
           rrContent[2]->getFilledRectangles(collecter, depth+1);
@@ -355,9 +340,9 @@ namespace RoomCReconstruction {
 
 
 
-    Eigen::Vector3d calcPerpendicular(Eigen::Vector3d vec);
+    Eigen::Vector3d calcPerpendicular(const Eigen::Vector3d& vec);
 
-    void printMyVec(Eigen::Vector3d vec);
+    void printMyVec(const Eigen::Vector3d& vec);
 
     /*void printV(Eigen::Vector3d vec) {
         std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
@@ -366,14 +351,14 @@ namespace RoomCReconstruction {
 
     bool intersect3Clusters(Cluster cluster1, Cluster cluster2, Cluster cluster3, Eigen::Vector3d& resultPoint);
 
-    void planifyCluster(Cluster cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles);
+    void planifyCluster(const Cluster& cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles, const double avg_spacing);
     std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector3d> pointsReal);
     std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector2d> points);
 
 
     void
     extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
-                    const std::vector <TangentSpace::LocalPCA> &local_pcas);
+                    const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing);
 
 
 }
