@@ -29,5 +29,44 @@ namespace RoomCReconstruction {
 
   }
 
+
+  double safe_acos(double value) {
+    if (value <= -1) {
+      return std::numbers::pi_v<double>;
+    } else if(value >= 1) {
+      return 0;
+    } else {
+      return acos(value);
+    }
+  }
+
+
+  double gaussian_1d(const double x, const double A, const double x0, const double sigma_x) {
+    const double delta_x{x - x0};
+    const double denominator_x{2.0 * sigma_x * sigma_x};
+    const double x_term{delta_x * delta_x / denominator_x};
+    return A * std::exp(-(x_term));
+  };
+
+
+  double gaussian_2d(const double x, const double y, const double A, const double x0, const double y0,
+              const double sigma_x, const double sigma_y) {
+
+    const double delta_x{x - x0};
+    const double denominator_x{2.0 * sigma_x * sigma_x};
+    const double x_term{delta_x * delta_x / denominator_x};
+    const double delta_y{y - y0};
+    const double denominator_y{2.0 * sigma_y * sigma_y};
+    const double y_term{delta_y * delta_y / denominator_y};
+    return A * std::exp(-(x_term + y_term));
+  }
+
+
+  /**
+   *  Calculates absolute Distance from vec1 to vec2. Order doesn't matter
+   */
+  double calcDistance(Eigen::Vector3d vec1, Eigen::Vector3d vec2) {
+    return (vec2 - vec1).norm();
+  }
 }
 

@@ -8,7 +8,7 @@
 #include "ts/pc/pc_tools.hpp"
 #include <iostream>
 
-namespace RoomCReconstruction::IO {
+namespace RoomCReconstruction {
 
   struct vertex { double x, y, z; };
   struct face_indices { std::uint32_t i0, i1, i2; };

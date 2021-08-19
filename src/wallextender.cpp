@@ -8,7 +8,7 @@
 
 #include <cmath>
 #include <iostream>
-
+#include <algorithm>
 
 
 namespace RoomCReconstruction {
@@ -16,6 +16,8 @@ namespace RoomCReconstruction {
 
     const std::array<unsigned char, 3> colorBlack = {0, 0, 0};
     const std::array<unsigned char, 3> colorRed = {255, 0, 0};
+    const std::array<unsigned char, 3> colorGreen = {0, 255, 0};
+    const std::array<unsigned char, 3> colorBlue = {0, 0, 255};
 
 
     void extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
@@ -23,22 +25,7 @@ namespace RoomCReconstruction {
 
         std::cout << "extending wallpoint";
 
-        const auto gaussian_2d{[](const double x,
-                                  const double y,
-                                  const double A,
-                                  const double x0,
-                                  const double y0,
-                                  const double sigma_x,
-                                  const double sigma_y) -> double {
-            // Easier to read formula
-            const double delta_x{x - x0};
-            const double denominator_x{2.0 * sigma_x * sigma_x};
-            const double x_term{delta_x * delta_x / denominator_x};
-            const double delta_y{y - y0};
-            const double denominator_y{2.0 * sigma_y * sigma_y};
-            const double y_term{delta_y * delta_y / denominator_y};
-            return A * std::exp(-(x_term + y_term));
-        }};
+
 
 
         std::vector <std::array<unsigned char, 3>> colors(
@@ -65,7 +52,7 @@ namespace RoomCReconstruction {
             for (int j = 0; j != clusters.size(); j++) {
                 if (clusters[j].checkAdd(points.col(static_cast<Eigen::Index>(i)), local_pcas[i].local_base.col(2),
                                          i)) {
-                    colors[i] = clusters[j].color;
+                    //colors[i] = clusters[j].color;
                     found = true;
                     break;
                 }
@@ -218,7 +205,7 @@ namespace RoomCReconstruction {
 
 
 
-        TangentSpace::IO::write3DPointsWithColors("output_clustering.ply", printMat, colors);
+
 
 
         // For every cluster that has at least 4 intersection-points, take the first 4 intersection-points and create a plane
@@ -228,7 +215,7 @@ namespace RoomCReconstruction {
           realpoints.emplace_back(clusters[i].intersectionsPoints);
         }
 
-        RoomCReconstruction::IO::createPlanarRoom("interpolation_method.ply", realpoints);
+        RoomCReconstruction::createPlanarRoom("interpolation_method.ply", realpoints);
 
 
 
@@ -240,7 +227,82 @@ namespace RoomCReconstruction {
         planifyCluster(clusters[i], filledRectanglesResult, avg_spacing);
       }
 
-      RoomCReconstruction::IO::createPlanarRoom("planification_method.ply", filledRectanglesResult);
+
+      // Find floor-cluster and roof cluster
+      double maxDown = std::numeric_limits<double>::max();
+      double maxUp = std::numeric_limits<double>::min();
+      int clusterDownIndex = -1;
+      int clusterUpIndex = -1;
+      for (int i = 0; i < clusters.size(); i++) {
+
+        Eigen::Vector3d floorNormalAssumption{0, 0, 1};
+        double angle = safe_acos(clusters[i].normal.dot(floorNormalAssumption) / (clusters[i].normal.norm() * floorNormalAssumption.norm()));
+        double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 12);
+        if (gaussian_angle > 0.1) {
+          if (clusters[i].center[2] < maxDown) {
+            clusterDownIndex = i;
+            maxDown = clusters[i].center[2];
+          }
+          if (clusters[i].center[2] > maxUp) {
+            clusterUpIndex = i;
+            maxUp = clusters[i].center[2];
+          }
+        }
+      }
+
+      //std::vector<Eigen::Vector2d> floorEdgesPoints;
+
+      //Search wall clusters
+      std::vector<int> wallClusters;
+      for (int i = 0; i < clusters.size(); i++) {
+        if ((abs(clusters[i].normal[2]) < 0.01) && abs(maxUp - clusters[i].max_top) < 25 && abs(maxDown - clusters[i].max_bot) < 25) {
+          for (int k = 0; k < clusters[i].points.size(); k++) {
+            colors[clusters[i].points[k]] = colorGreen;
+          }
+
+
+          wallClusters.push_back(i);
+          //std::array<Eigen::Vector2d, 2> edge = calculateWallBoundaries(clusters[i]);
+          //floorEdgesPoints.push_back(edge[0]);
+          //floorEdgesPoints.push_back(edge[1]);
+        }
+      }
+
+
+
+
+      std::cout << "ClusterIndex: " << clusterDownIndex;
+      if (clusterDownIndex != -1) {
+        for (int k = 0; k < clusters[clusterDownIndex].points.size(); k++) {
+          colors[clusters[clusterDownIndex].points[k]] = colorRed;
+        }
+      }
+      if (clusterUpIndex != -1) {
+        for (int k = 0; k < clusters[clusterUpIndex].points.size(); k++) {
+          colors[clusters[clusterUpIndex].points[k]] = colorBlue;
+        }
+      }
+
+
+      // Method 2: Planify floor, ceiling and walls - cluster
+      std::vector<std::vector <Eigen::Vector3d>> filledRectanglesResultFCW;
+      for (int i = 0; i < clusters.size(); i++) {
+        if (i == clusterDownIndex || i == clusterUpIndex || (std::find(wallClusters.begin(), wallClusters.end(), i) != wallClusters.end())) {
+          planifyCluster(clusters[i], filledRectanglesResultFCW, avg_spacing);
+        }
+
+      }
+
+
+
+      //write2Dpoints("floorEdges.ply", floorEdgesPoints);
+
+
+
+      TangentSpace::IO::write3DPointsWithColors("output_clustering.ply", printMat, colors);
+
+      RoomCReconstruction::createPlanarRoom("planification_method.ply", filledRectanglesResult);
+      RoomCReconstruction::createPlanarRoom("planification_method_FCW.ply", filledRectanglesResultFCW);
     }
 
 
@@ -336,4 +398,20 @@ namespace RoomCReconstruction {
 
       return points3D;
     }
+
+
+    // Doesn't work very well
+    /*std::array<Eigen::Vector2d, 2> calculateWallBoundaries(const Cluster& wallcluster) {
+      double maxX, maxY = std::numeric_limits<double>::min();
+      double minX, minY = std::numeric_limits<double>::max();
+
+      for (const Eigen::Vector3d& p : wallcluster.pointsReal) {
+        if (p[0] > maxX) maxX = p[0];
+        if (p[0] < minX) minX = p[0];
+        if (p[1] > maxY) maxY = p[1];
+        if (p[1] < minY) minY = p[1];
+      }
+      return {Eigen::Vector2d{maxX, maxY}, Eigen::Vector2d{minX, minY}};
+    }*/
+
 }

@@ -3,6 +3,7 @@
 //
 #include "tinyply/tinyply.hpp"
 
+#include "Helper.hpp"
 #include "rcr_io.hpp"
 
 #include <cstring>
@@ -13,7 +14,7 @@
 #include <string_view>
 
 
-namespace RoomCReconstruction::IO {
+namespace RoomCReconstruction {
 
 
 
@@ -85,15 +86,9 @@ namespace RoomCReconstruction::IO {
   //       For the second face, we take point 3 for sure and the 2 points closest to point 3.
   std::array<face_indices, 2> getFaces(std::vector <Eigen::Vector3d> points) {
 
-    // TODO: This method is defined twice (another occurence is in wallextender.hpp). Create "Tool"-Class for this and other methods.
-    const auto calcDistance12345 {[](Eigen::Vector3d vec1, Eigen::Vector3d vec2) -> double {
-      return (vec2 - vec1).norm();
-    }};
-
-
-    double d0 = calcDistance12345(points[3], points[0]);
-    double d1 = calcDistance12345(points[3], points[1]);
-    double d2 = calcDistance12345(points[3], points[2]);
+    double d0 = calcDistance(points[3], points[0]);
+    double d1 = calcDistance(points[3], points[1]);
+    double d2 = calcDistance(points[3], points[2]);
 
     // d0 is maximum
     if (d0 >= d1 && d0 >= d2) {

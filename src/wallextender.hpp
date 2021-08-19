@@ -44,6 +44,8 @@ namespace RoomCReconstruction {
 
         ClusterContour contour;
         double max_distance;
+        double max_top = std::numeric_limits<double>::min();
+        double max_bot = std::numeric_limits<double>::max();
 
         std::vector <Eigen::Vector3d> intersectionsPoints;
 
@@ -69,29 +71,15 @@ namespace RoomCReconstruction {
                 pointsReal.push_back(point);
                 updateCenter(point);
                 updateNormal(pointNormal);
-
+                updateBotTop(point);
 
                 return true;
             }
             return false;
         }
 
-        double safe_acos(double value) {
-          if (value <= -1) {
-            return std::numbers::pi_v<double>;
-          } else if(value >= 1) {
-            return 0;
-          } else {
-            return acos(value);
-          }
-        }
 
-        double gaussian_1d(const double x, const double A, const double x0, const double sigma_x) {
-            const double delta_x{x - x0};
-            const double denominator_x{2.0 * sigma_x * sigma_x};
-            const double x_term{delta_x * delta_x / denominator_x};
-            return A * std::exp(-(x_term));
-        };
+
 
         void updateCenter(Eigen::Vector3d newPoint) {
             center = (center * (points.size() - 1) + newPoint) / points.size();
@@ -104,6 +92,12 @@ namespace RoomCReconstruction {
             //std::cout << "Center is now: " << "[" << center.x() << "," << center.y() << "," << center.z() << "]" << "\n";
 
         }
+
+        void updateBotTop(const Eigen::Vector3d& p) {
+          if (p[2] > max_top) max_top = p[2];
+          if (p[2] < max_bot) max_bot = p[2];
+        }
+
 
         double getPlaneD() {
           return normal.dot(center);
@@ -166,13 +160,6 @@ namespace RoomCReconstruction {
             std::cout << "\n";*/
 
             return contour.contourPoints.size();
-        }
-
-        /**
-         *  Calculates absolute Distance from vec1 to vec2. Order doesn't matter
-         */
-        double calcDistance(Eigen::Vector3d vec1, Eigen::Vector3d vec2) {
-          return (vec2 - vec1).norm();
         }
 
         /**
@@ -354,11 +341,14 @@ namespace RoomCReconstruction {
     void planifyCluster(const Cluster& cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles, const double avg_spacing);
     std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector3d> pointsReal);
     std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector2d> points);
+    //std::array<Eigen::Vector2d, 2> calculateWallBoundaries(const Cluster& wallcluster);
 
 
     void
     extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
                     const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing);
+
+
 
 
 }

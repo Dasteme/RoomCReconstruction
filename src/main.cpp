@@ -66,7 +66,7 @@ int main(int argc, const char* argv[]) {
 
     // Compute PCA
     time_measure = std::chrono::high_resolution_clock::now();
-    constexpr std::size_t PCA_K = 60;
+    constexpr std::size_t PCA_K = 120;
     const auto local_pcas = TangentSpace::computeLocalPCAAllPoints(
             search_tree,
             PCA_K,
