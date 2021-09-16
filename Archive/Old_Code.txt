@@ -1,0 +1,515 @@
+        // Simple contour calculation (not exact, e.g. for increasing by 10% to intersect with other clusters)
+        // But there is a more simple approach: intersect 3 cluster-planes regardless of the contour and then get the
+        // minimum distance to each cluster.
+        //
+        double calculateClusterContour() {
+
+          // TODO: Why does this method not have access to the function "calcPerpendicular" further down?
+          const auto calcPerpendicular12345 {[](Eigen::Vector3d vec) -> Eigen::Vector3d {
+            return std::abs(vec[2]) < std::abs(vec[0]) ? Eigen::Vector3d(vec.y(), -vec.x(), 0) : Eigen::Vector3d(0, -vec.z(), vec.y());
+            }
+          };
+
+
+            Eigen::Vector3d perpendicular_vec = calcPerpendicular12345(normal);
+            for (int i = 0; i < CLUSTER_CONTOUR_K_SAMPLES; i++ ) {
+                double rotation_in_radians = 2*std::numbers::pi_v<double> * (i / static_cast<double>(CLUSTER_CONTOUR_K_SAMPLES));
+                Eigen::AngleAxis<double> rotationMatrix(rotation_in_radians, normal);
+
+                Eigen::Vector3d scan_direction = rotationMatrix * perpendicular_vec;
+
+                // Get the furthest point away from center w.r.t. the "scan_direction".
+                double maxdistance = 0;
+                int furthestPoint = -1;
+                for (int i = 0; i < points.size(); i++) {
+                    Eigen::Vector3d currentPoint = pointsReal[i];
+                    double point_angle_wrt_scandir = calcAngle(currentPoint - center, scan_direction);
+                    if (point_angle_wrt_scandir < 2*std::numbers::pi_v<double> / static_cast<double>(CLUSTER_CONTOUR_K_SAMPLES)) {
+                        double dist = calcDistanceToCenter(currentPoint);
+                        if (dist > maxdistance) { maxdistance = dist; furthestPoint = i; }
+                    }
+                }
+                if (furthestPoint != -1) {
+                    contour.addContourPoint(furthestPoint);
+                }
+            }
+
+            /*std::cout << "vector: ";
+            printVec(perpendicular_vec);
+            std::cout << " gets transformed to: ";
+            printVec(rotationMatrix * perpendicular_vec);
+            std::cout << "\n";*/
+
+            return contour.contourPoints.size();
+        }
+
+
+
+
+
+
+
+        // Calculates the maximum "width"/"radius" of the clusters, i.e. the point furthest away frm center.
+        //
+        double calculateMaxDistance() {
+            max_distance = 0;
+            for (int i = 0; i < points.size(); i++) {
+                double dist = calcDistanceToCenter(pointsReal[i]);
+                if (dist > max_distance) { max_distance = dist; }
+            }
+            return max_distance;
+        }
+
+
+
+
+
+
+
+
+
+
+        // Very old approach to remove furniture.
+        // The idea was to generate rays from the center to every cluster c.
+        // If the ray hits another cluster behind c (the cluster that was used for the ray), this would mean c is a
+        // furniture cluster.
+        // On the other hand, if c is a wall cluster, nothing should be hit behind c.
+        // This does not work well because of many reasons.
+        // First of all, if the pointcloud was generated from only one scan, it would look like a distorted sphere.
+        // What this means is that in each direction, we have at most only one layer. Furniture hides walls.
+        // So we would need to determine ray-intersections from furniture to walls by increasing walls (where there are no points).
+        // But we don't know in which directions and by how much. Furthermore, we would also need to increase furniture-
+        // clusters because we can't distinguish them from wall-clusters in the first place.
+        //
+        // The second problem of this approach is that we might delete wall-clusters if they are build like this:
+        // (i.e., not convex)
+        //
+        // ###########        #################
+        // #    2    #3       #5      6
+        // #         ##########
+        // #1           4                 C
+        // #
+        //
+        // In this case, we would classify cluster 5 as furniture because it hits the extension of cluster 2 (and cluster 6)
+        //
+        // So this approach is very hard if not impossible to do.
+        // The code below did never work very well (most likely because of the above reasons)
+
+
+
+        // ***
+        // Delete "furniture"-clusters like chairs.
+        // For this, it checks wheter the cluster is furthest away from center in a certain direction.
+        // ***
+
+        // First approximately calculate center of point cloud by taking mean of cluster-centers.
+        /*Eigen::Vector3d centerPointCloud(0, 0, 0);
+        size_t clusterPoints = 0;
+        for (int i = 0; i < clusters.size(); i++) {
+            centerPointCloud = centerPointCloud + clusters[i].center*clusters[i].points.size();
+            clusterPoints += clusters[i].points.size();
+        }
+        centerPointCloud = centerPointCloud / clusterPoints;
+        std::cout << "Vector:" << "[" << centerPointCloud.x() << "," << centerPointCloud.y() << ","
+                  << centerPointCloud.z() << "]" << "\n";
+
+        double furthestDistance = 0;
+
+        for (int i = 0; i < local_pcas.size(); i++) {
+            double distI = (points.col(static_cast<Eigen::Index>(i)) - centerPointCloud).norm();
+            furthestDistance = (distI > furthestDistance) ? distI : furthestDistance;
+            if (!(i % 10000)) {
+                std::cout << "Furthest distance: " << furthestDistance << "\n";
+            }
+        }
+
+        std::cout << "Furthest distance: " << furthestDistance << "\n";
+
+        for (int i = 0; i < clusters.size(); i++) {
+            std::cout << "check cluster: " << i << "\n";
+            for (int j = 0; j < clusters.size(); j++) {
+                if (i == j) continue;
+                Eigen::Vector3d rayDir = (clusters[i].center - centerPointCloud).normalized();
+                std::cout << clusters[i].center << "\n";
+                if (clusters[j].rayIntersect(centerPointCloud, rayDir, furthestDistance)) {
+
+
+                    if ((clusters[i].center - centerPointCloud).norm() <
+                        (clusters[j].center - centerPointCloud).norm()) {
+                        std::cout << "Remove cluster: " << i << " intersects with " << j << "\n";
+
+                        for (int k = 0; k < clusters[i].points.size(); k++) {
+                            //colors[clusters[i].points[k]] = colorBlack;
+                        }
+
+                    }
+
+                    break;
+                }
+            }
+        }*/
+
+
+
+
+       /*bool rayIntersect(Eigen::Vector3d rayOrigin, Eigen::Vector3d rayDirection, double furtestDist) {
+                   std::cout << "does: " << "[" << rayOrigin.x() << "," << rayOrigin.y() << ","
+                             << rayOrigin.z() << "]" << ", " << "[" << rayDirection.x() << "," << rayDirection.y() << ","
+                             << rayDirection.z() << "]" << " intersect with " << "[" << center.x() << "," << center.y() << ","
+                             << center.z() << "]" << "," << "[" << normal.x() << "," << normal.y() << ","
+                             << normal.z() << "]" << "?\n";
+                   double dividor = normal.dot(rayDirection);
+                   if (dividor == 0) { return false; }
+
+                   double distance = normal.dot(center - rayOrigin) / dividor;
+
+                   std::cout << distance << "\n\n";
+                   return (distance > 0 && distance < furtestDist) ? true : false;
+               }*/
+
+
+
+
+
+
+
+
+
+       // Code to intersect 3 clusters, adapted to work with 2 wall clusters and 1 floor / ceiling cluster.
+       // Works quite nice, but there are 2 problems:
+       //
+       // 1. In order to not intersect across the whole room (/ every cluster with every other), we need to set a
+       //    treshhold for the maximum "interpolation"-distance (i.e. the part where we set a "wall" where there are no points).
+       //    In the code below, the treshhold is set to 40 cm, this means we can extend walls up to 40 cm.
+       //    If a big object (>40cm) is in front of a corner, we cannot find the cornerpoint.
+       //
+       // 2. The clusters need postprocessing in order for this approach to work.
+       //    For example, if a flat side of a chair is aligned with a part of the wall, the wall-cluster contains also
+       //    the points of the chair. This results in possible corner-points we dont want.
+       //    Another example is shown below:
+       //
+       //         ############
+       //     1  #           #  2
+       //    #####           ######
+       //    #                    #
+       //    #                    #
+       //    #                    #
+       //    #                    #
+       //    ######################
+       //
+       //   Here, the parts of the room which are marked as 1 and 2 are actually just one cluster.
+       //   This is because of the algorithm that creates the cluster. The points are all on the same plane in the space.
+       //   Because of this, the algorithm above creates a wall straight through the room.
+       //
+       //   Note: The current approach to solve this is to "postprocess" the (wall-)clusters where we divide the clusters
+       //         into multiple ones when there is a gap (e.g. > 5 cm) between points.
+       //         Note that this is only possible with wallclusters, because there we can project them on 2 dimensions. (we have a direction to project)
+       //         Another way would be to use a clustering approach, e.g. k-means clustering, where we divide clusters further into coherent groups.
+       //         This is not used because it increases the computing time more than the simpler approach, and might not be as precise.
+
+        /*for (int j : wallClusters) {
+          for (int k : wallClusters) {
+            if (k == j) continue;
+            Eigen::Vector3d resultpoint;
+            if (RoomCReconstruction::intersect3Clusters(
+              clusters[i], clusters[j], clusters[k], resultpoint)) {
+              double dc1 = clusters[i].calcDistanceToCenter(resultpoint);
+              double dc2 = clusters[j].calcDistanceToCenter(resultpoint);
+              double dc3 = clusters[k].calcDistanceToCenter(resultpoint);
+
+              double cdc1 = clusters[i].calculateClosestDistanceToCluster(resultpoint);
+              double cdc2 = clusters[j].calculateClosestDistanceToCluster(resultpoint);
+              double cdc3 = clusters[k].calculateClosestDistanceToCluster(resultpoint);
+
+
+              if (cdc1 <= 40 &&
+                  cdc2 <= 40 &&
+                  cdc3 <= 40) {
+
+                clusters[i].intersectionsPoints.push_back(resultpoint);
+                clusters[j].intersectionsPoints.push_back(resultpoint);
+                clusters[k].intersectionsPoints.push_back(resultpoint);
+
+
+                std::cout << "Clostest distances: " << cdc1 << ", " << cdc2 << ", " << cdc3;
+                std::cout << "found intersection between: " << i << "," << j << "," << k << ", " << "point: ";
+                printMyVec(resultpoint);
+                std::cout << "\n";
+
+                intersectPoints.conservativeResize(intersectPoints.rows(), intersectPoints.cols()+1);
+                intersectPoints.col(intersectPoints.cols()-1) = resultpoint;
+                //Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(intersectPoints.rows(), intersectPoints.cols() + 1);
+                colors.push_back(colorRed);
+              }
+            }
+          }
+        }*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // "Planification"-Code
+        // Code to transform a cluster (set of points lying on a plane) into actual quadrants of planes.
+        // This works with holes in the plane, e.g. a door that cuts of a part of the wall.
+        //
+        // The code works, but there is one major issue.
+        // If a wall is very long and parts of it are close to the scanner and some parts are far away, then the
+        // Density of the points varies.
+        // Points closer to the scanner have higher density, where as points far away have smaller density.
+        // For this approach, the density is used to determine if a quadrant is solid or if it is "air" (e.g. door/window).
+        // If the density varies, we cannot set a constant treshhold to determine whether a part is solid/air.
+        //
+        // Another reason for the removal of this code was that it doesn't interpolate walls.
+        // We can just "planify" the clusters, but we cannot link them together.
+        // So we get not closed room, and also get holes in the planes where furniture hides the wall.
+        //
+
+
+
+    // Code in wallextender.hpp
+
+    class RecursiveRectangle {
+    public:
+      enum fillState {notDetermined, special, notFilled, filled};
+
+      std::array<double, 4> bounds;   //x, y, width, height
+      std::array<std::unique_ptr<RecursiveRectangle>, 4> rrContent;
+      std::vector <Eigen::Vector2d> points;
+      fillState fstate = fillState::notDetermined;
+
+      void buildRRContent(double avg_spacing) {
+        //std::cout << "Build rrContent within: " << bounds[0] << ", " << bounds[1] << ", [" << bounds[2] << ", " << bounds[3] << "]\n";
+
+        // No points in cluster, 1st case to break recursion
+        if (points.size() == 0) {fstate = fillState::notFilled; return; }
+
+        // Points density is enough s.t. we can skip further divisions, 2nd case
+        if (points.size() / getArea() >= (1 / (pow(avg_spacing/2, 2) * std::numbers::pi_v<double>))) {fstate = fillState::filled;   //TODO: Replace 7 by something related to the average spacing. Maybe (1/avg_spacing)^2 ?
+
+
+
+          //std::cout << "filled!! \n";
+          return; }
+
+        // Special case: Divide current Rectangle into 4 pieces.
+        rrContent[0] = std::make_unique<RecursiveRectangle>();
+        rrContent[1] = std::make_unique<RecursiveRectangle>();
+        rrContent[2] = std::make_unique<RecursiveRectangle>();
+        rrContent[3] = std::make_unique<RecursiveRectangle>();
+
+        rrContent[0]->fstate = fillState::notDetermined;
+        rrContent[1]->fstate = fillState::notDetermined;
+        rrContent[2]->fstate = fillState::notDetermined;
+        rrContent[3]->fstate = fillState::notDetermined;
+
+
+
+        double wHalf = bounds[2] / 2;
+        double hHalf = bounds[3] / 2;
+
+        rrContent[0]->bounds = {bounds[0], bounds[1], wHalf, hHalf};
+        rrContent[1]->bounds = {bounds[0]+wHalf, bounds[1], wHalf, hHalf};
+        rrContent[2]->bounds = {bounds[0], bounds[1]+hHalf, wHalf, hHalf};
+        rrContent[3]->bounds = {bounds[0]+wHalf, bounds[1]+hHalf, wHalf, hHalf};
+
+
+        // Divide points into their respective subrectangle
+        for (const auto &p : points) {
+          if (rrContent[0]->checkAndAdd(p)) continue;
+          if (rrContent[1]->checkAndAdd(p)) continue;
+          if (rrContent[2]->checkAndAdd(p)) continue;
+          if (rrContent[3]->checkAndAdd(p)) continue;
+          std::cout << "error occured"; // Note: can happen due to double precision
+        }
+
+        rrContent[0]->buildRRContent(avg_spacing);
+        rrContent[1]->buildRRContent(avg_spacing);
+        rrContent[2]->buildRRContent(avg_spacing);
+        rrContent[3]->buildRRContent(avg_spacing);
+
+        fstate = fillState::special;
+      }
+
+      bool checkAndAdd(Eigen::Vector2d p) {
+        if (p.x() < bounds[0] || p.x() > bounds[0]+bounds[2]) return false;
+        if (p.y() < bounds[1] || p.y() > bounds[1]+bounds[3]) return false;
+        points.emplace_back(p);
+        return true;
+      }
+
+      double getArea() {
+        return bounds[2] * bounds[3];
+      }
+
+
+      void getFilledRectangles(std::vector<std::vector <Eigen::Vector2d>>& collecter, int depth) {
+
+        if (depth > 100) {
+          std::cout << "Return due to depth...\n";
+          return;
+        }
+
+        if (fstate == fillState::filled) {
+          /*std::vector<Eigen::Vector3d> cornerPoints;
+          cornerPoints.push_back(Eigen::Vector3d{ bounds[0], bounds[1], 0 });
+          cornerPoints.push_back(Eigen::Vector3d{ bounds[0] + bounds[2], bounds[1], 0 });
+          cornerPoints.push_back(Eigen::Vector3d{ bounds[0], bounds[1] + bounds[3], 0 });
+          cornerPoints.push_back(Eigen::Vector3d{ bounds[0] + bounds[2], bounds[1] + bounds[3], 0 });
+
+          collecter.push_back(cornerPoints);
+          std::cout << "New SIZE: " << collecter.size() << "\n";*/
+
+          std::vector<Eigen::Vector2d> cornerPoints;
+          cornerPoints.push_back(Eigen::Vector2d{ bounds[0], bounds[1]});
+          cornerPoints.push_back(Eigen::Vector2d{ bounds[0] + bounds[2], bounds[1]});
+          cornerPoints.push_back(Eigen::Vector2d{ bounds[0], bounds[1] + bounds[3]});
+          cornerPoints.push_back(Eigen::Vector2d{ bounds[0] + bounds[2], bounds[1] + bounds[3]});
+
+          collecter.push_back(cornerPoints);
+
+
+          return;
+        } else if (fstate == fillState::notFilled) {
+          return;
+        } else if (fstate == fillState::special) {
+          rrContent[0]->getFilledRectangles(collecter, depth+1);
+          rrContent[1]->getFilledRectangles(collecter, depth+1);
+          rrContent[2]->getFilledRectangles(collecter, depth+1);
+          rrContent[3]->getFilledRectangles(collecter, depth+1);
+          return;
+        } else if (fstate == fillState::notDetermined) {
+          std::cout << fstate << ": We have a special error case :(\n";
+          return;
+        }
+        std::cout << fstate << ": Should not happen: State is not defined...\n";
+      }
+    };
+
+
+    void planifyCluster(const Cluster& cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles, const double avg_spacing);
+    std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector3d> pointsReal);
+    std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector2d> points);
+
+
+
+
+
+
+
+    // Code in wallextender.cpp
+
+
+    // Method 2: Planify every cluster - Transform clusters into planes
+    std::vector<std::vector <Eigen::Vector3d>> filledRectanglesResult;
+    for (int i = 0; i < clusters.size(); i++) {
+      planifyCluster(clusters[i], filledRectanglesResult, avg_spacing);
+    }
+    RoomCReconstruction::createPlanarRoom("planification_method.ply", filledRectanglesResult);
+
+
+    // Method 2: Planify floor, ceiling and walls - cluster
+    std::vector<std::vector <Eigen::Vector3d>> filledRectanglesResultFCW;
+    for (int i = 0; i < clusters.size(); i++) {
+      if (i == idxFloorCluster || i == idxCeilingCluster || (std::find(wallClusters.begin(), wallClusters.end(), i) != wallClusters.end())) {
+        planifyCluster(clusters[i], filledRectanglesResultFCW, avg_spacing);
+      }
+    }
+    RoomCReconstruction::createPlanarRoom("planification_method_FCW.ply", filledRectanglesResultFCW);
+
+
+
+
+    void planifyCluster(const Cluster& cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles, const double avg_spacing) {
+
+      // First calculate 2 perpendicular vectors to the normal. These are required and define the axis in 2D.
+      Eigen::Vector3d a1 = calcPerpendicular(cluster.normal);
+      Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, cluster.normal);
+      Eigen::Vector3d a2 = rotationMatrix * a1;
+
+      std::vector<Eigen::Vector2d> cluster02dpoints = transformPlanePointsTo2D(cluster.normal, cluster.center, a1, a2, cluster.pointsReal);
+      RecursiveRectangle rrCluster0;
+      double xMin = std::numeric_limits<double>::max();
+      double xMax = std::numeric_limits<double>::min();
+      double yMin = std::numeric_limits<double>::max();
+      double yMax = std::numeric_limits<double>::min();
+      for (const auto &p : cluster02dpoints) {
+        if (p.x() < xMin) xMin = p.x();
+        if (p.x() > xMax) xMax = p.x();
+        if (p.y() < yMin) yMin = p.y();
+        if (p.y() > yMax) yMax = p.y();
+      }
+
+      std::vector<std::vector <Eigen::Vector2d>> filledRectangles2d;
+      rrCluster0.bounds = {xMin, yMin, xMax-xMin, yMax-yMin};
+      rrCluster0.points = cluster02dpoints;
+      rrCluster0.buildRRContent(avg_spacing);
+
+
+      rrCluster0.getFilledRectangles(filledRectangles2d, 0);
+      std::cout << "Recursion finished\n";
+
+      std::cout << "Filled Rectangles count:" << filledRectangles2d.size();
+
+      for (const auto& rect : filledRectangles2d) {
+        filledRectangles.push_back(transform2DToPlanePoints(cluster.normal, cluster.center, a1, a2, rect));
+      }
+
+    }
+
+
+
+
+    std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector3d> pointsReal) {
+      assert (normal.dot(a1) > 0.001);
+      assert (normal.dot(a2) > 0.001);
+      assert (a1.dot(a2) > 0.001);
+
+      std::vector <Eigen::Vector2d> points2D;
+
+      for (int i = 0; i < pointsReal.size(); i++) {
+        points2D.emplace_back(Eigen::Vector2d{a1.dot(pointsReal[i] - center), a2.dot(pointsReal[i] - center)});
+      }
+
+      //Debug
+      //write2Dpoints("transform_3d_2d_debug.ply", points2D);
+
+      return points2D;
+    }
+
+
+    std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector2d> points) {
+      assert (normal.dot(a1) > 0.001);
+      assert (normal.dot(a2) > 0.001);
+      assert (a1.dot(a2) > 0.001);
+
+      std::vector <Eigen::Vector3d> points3D;
+      for (int i = 0; i < points.size(); i++) {
+        points3D.emplace_back(center + points[i].x()*a1 + points[i].y()*a2);
+      }
+
+      return points3D;
+    }
+
+
+
+
+
+
+

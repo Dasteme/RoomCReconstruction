@@ -77,5 +77,15 @@ namespace RoomCReconstruction {
   double calcDistance(Eigen::Vector3d vec1, Eigen::Vector3d vec2) {
     return (vec2 - vec1).norm();
   }
+
+
+  Eigen::Vector3d calcPerpendicular(const Eigen::Vector3d& vec) {
+    return std::abs(vec[2]) < std::abs(vec[0]) ? Eigen::Vector3d(vec.y(), -vec.x(), 0) : Eigen::Vector3d(0, -vec.z(), vec.y());
+  }
+
+
+  void printMyVec(const Eigen::Vector3d& vec) {
+    std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
+  }
 }
 
