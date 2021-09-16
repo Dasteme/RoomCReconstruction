@@ -99,56 +99,9 @@ namespace RoomCReconstruction {
 
 
 
-        Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(3, 0);
-
-        for (int i = 0; i < clusters.size(); i++) {
-          for (int j = i + 1; j < clusters.size(); j++) {
-            for (int k = j + 1; k < clusters.size(); k++) {
-              Eigen::Vector3d resultpoint;
-              if (RoomCReconstruction::intersect3Clusters(
-                clusters[i], clusters[j], clusters[k], resultpoint)) {
-                double dc1 = clusters[i].calcDistanceToCenter(resultpoint);
-                double dc2 = clusters[j].calcDistanceToCenter(resultpoint);
-                double dc3 = clusters[k].calcDistanceToCenter(resultpoint);
-
-                double cdc1 = clusters[i].calculateClosestDistanceToCluster(resultpoint);
-                double cdc2 = clusters[j].calculateClosestDistanceToCluster(resultpoint);
-                double cdc3 = clusters[k].calculateClosestDistanceToCluster(resultpoint);
 
 
-                if (cdc1 <= 10 &&
-                    cdc2 <= 10 &&
-                    cdc3 <= 10) {
 
-                  clusters[i].intersectionsPoints.push_back(resultpoint);
-                  clusters[j].intersectionsPoints.push_back(resultpoint);
-                  clusters[k].intersectionsPoints.push_back(resultpoint);
-
-
-                  std::cout << "Clostest distances: " << cdc1 << ", " << cdc2 << ", " << cdc3;
-                  std::cout << "found intersection between: " << i << "," << j << "," << k << ", " << "point: ";
-                  printMyVec(resultpoint);
-                  std::cout << "\n";
-
-                  intersectPoints.conservativeResize(intersectPoints.rows(), intersectPoints.cols()+1);
-                  intersectPoints.col(intersectPoints.cols()-1) = resultpoint;
-                  //Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(intersectPoints.rows(), intersectPoints.cols() + 1);
-                  colors.push_back(colorRed);
-                }
-              }
-            }
-          }
-        }
-
-        Eigen::Matrix<double, 3, Eigen::Dynamic> printMat(points.rows(), points.cols() + intersectPoints.cols());
-        printMat << points, intersectPoints;
-
-
-        for (int i = 0; i < clusters.size(); i++) {
-          if (clusters[i].intersectionsPoints.size() == 4) {
-
-          }
-        }
 
         // ***
         // Delete "furniture"-clusters like chairs.
@@ -208,14 +161,7 @@ namespace RoomCReconstruction {
 
 
 
-        // For every cluster that has at least 4 intersection-points, take the first 4 intersection-points and create a plane
-        std::vector< std::vector <Eigen::Vector3d>> realpoints;
-        for (int i = 0; i < clusters.size(); i++) {
-            if (clusters[i].intersectionsPoints.size() < 4) continue;
-          realpoints.emplace_back(clusters[i].intersectionsPoints);
-        }
 
-        RoomCReconstruction::createPlanarRoom("interpolation_method.ply", realpoints);
 
 
 
@@ -228,77 +174,215 @@ namespace RoomCReconstruction {
       }
 
 
+      // * * * * * * * * * * * *
+      // Cluster-Classification
+      // * * * * * * * * * * * *
+
+      double floorLevel = std::numeric_limits<double>::max();
+      double ceilingLevel = std::numeric_limits<double>::min();
+      int idxFloorCluster = -1;
+      int idxCeilingCluster = -1;
+
+
+
       // Find floor-cluster and roof cluster
-      double maxDown = std::numeric_limits<double>::max();
-      double maxUp = std::numeric_limits<double>::min();
-      int clusterDownIndex = -1;
-      int clusterUpIndex = -1;
+
       for (int i = 0; i < clusters.size(); i++) {
 
         Eigen::Vector3d floorNormalAssumption{0, 0, 1};
         double angle = safe_acos(clusters[i].normal.dot(floorNormalAssumption) / (clusters[i].normal.norm() * floorNormalAssumption.norm()));
         double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 12);
         if (gaussian_angle > 0.1) {
-          if (clusters[i].center[2] < maxDown) {
-            clusterDownIndex = i;
-            maxDown = clusters[i].center[2];
+          if (clusters[i].center[2] < floorLevel) {
+            idxFloorCluster = i;
+            floorLevel = clusters[i].center[2];
           }
-          if (clusters[i].center[2] > maxUp) {
-            clusterUpIndex = i;
-            maxUp = clusters[i].center[2];
+          if (clusters[i].center[2] > ceilingLevel) {
+            idxCeilingCluster = i;
+            ceilingLevel = clusters[i].center[2];
           }
         }
       }
 
-      //std::vector<Eigen::Vector2d> floorEdgesPoints;
+      std::vector<Eigen::Vector2d> floorEdgesPoints;
+
+      int debugCounter = 10;
 
       //Search wall clusters
       std::vector<int> wallClusters;
       for (int i = 0; i < clusters.size(); i++) {
-        if ((abs(clusters[i].normal[2]) < 0.01) && abs(maxUp - clusters[i].max_top) < 25 && abs(maxDown - clusters[i].max_bot) < 25) {
-          for (int k = 0; k < clusters[i].points.size(); k++) {
-            colors[clusters[i].points[k]] = colorGreen;
-          }
+        if ((abs(clusters[i].normal[2]) < 0.01) && abs(ceilingLevel - clusters[i].max_top) < 25 && abs(floorLevel - clusters[i].max_bot) < 25) {
 
 
           wallClusters.push_back(i);
-          //std::array<Eigen::Vector2d, 2> edge = calculateWallBoundaries(clusters[i]);
-          //floorEdgesPoints.push_back(edge[0]);
-          //floorEdgesPoints.push_back(edge[1]);
+
+
+
+          //if (debugCounter-- <= 0) {
+            for (int k = 0; k < clusters[i].points.size(); k++) {
+              colors[clusters[i].points[k]] = clusters[i].color;
+            }
+
+          std::array<Eigen::Vector2d, 2> edge = calculateWallBoundaries(clusters[i]);
+          floorEdgesPoints.push_back(edge[0]);
+          floorEdgesPoints.push_back(edge[1]);
+
+          //}
+
         }
       }
 
+      write2Dpoints("floorEdges.ply", floorEdgesPoints);
+      writeEdges("floorEdgesLines12345.ply", simple2Dto3D(floorEdgesPoints));
 
-
-
-      std::cout << "ClusterIndex: " << clusterDownIndex;
-      if (clusterDownIndex != -1) {
-        for (int k = 0; k < clusters[clusterDownIndex].points.size(); k++) {
-          colors[clusters[clusterDownIndex].points[k]] = colorRed;
+      std::cout << "ClusterIndex: " << idxFloorCluster;
+      /*if (idxFloorCluster != -1) {
+        for (int k = 0; k < clusters[idxFloorCluster].points.size(); k++) {
+          colors[clusters[idxFloorCluster].points[k]] = colorRed;
         }
       }
-      if (clusterUpIndex != -1) {
-        for (int k = 0; k < clusters[clusterUpIndex].points.size(); k++) {
-          colors[clusters[clusterUpIndex].points[k]] = colorBlue;
+      if (idxCeilingCluster != -1) {
+        for (int k = 0; k < clusters[idxCeilingCluster].points.size(); k++) {
+          colors[clusters[idxCeilingCluster].points[k]] = colorBlue;
         }
-      }
+      }*/
 
 
       // Method 2: Planify floor, ceiling and walls - cluster
       std::vector<std::vector <Eigen::Vector3d>> filledRectanglesResultFCW;
       for (int i = 0; i < clusters.size(); i++) {
-        if (i == clusterDownIndex || i == clusterUpIndex || (std::find(wallClusters.begin(), wallClusters.end(), i) != wallClusters.end())) {
+        if (i == idxFloorCluster || i == idxCeilingCluster || (std::find(wallClusters.begin(), wallClusters.end(), i) != wallClusters.end())) {
           planifyCluster(clusters[i], filledRectanglesResultFCW, avg_spacing);
         }
 
       }
 
 
-
-      //write2Dpoints("floorEdges.ply", floorEdgesPoints);
-
+      Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(3, 0);
 
 
+
+
+
+
+
+
+
+      for (int i : {idxFloorCluster, idxCeilingCluster}) {
+
+        std::vector<int> checkedWalls;
+        checkedWalls.push_back(wallClusters[0]);     // Last element of this vector is current processed wall
+
+        while (checkedWalls.size() < wallClusters.size()) {
+
+          int idxCurrentWall = checkedWalls[checkedWalls.size()-1];
+          int idxClosestIntersection = -1;
+          double minDistance = 1000; //std::numeric_limits<double>::max();
+          Eigen::Vector3d pointClosestIntersection;
+
+          double cdc1Dbg;
+          double cdc2Dbg;
+          double cdc3Dbg;
+
+          for (int k : wallClusters) {
+            // If wall was already checked, continue;
+            if ((std::find(checkedWalls.begin() + 1, checkedWalls.end(), k) != checkedWalls.end())) { continue; }
+
+            Eigen::Vector3d resultpoint;
+            if (RoomCReconstruction::intersect3Clusters(
+              clusters[i], clusters[idxCurrentWall], clusters[k], resultpoint)) {
+
+              double cdc1 = clusters[i].calculateClosestDistanceToCluster(resultpoint);
+              double cdc2 = clusters[idxCurrentWall].calculateClosestDistanceToCluster(resultpoint);
+              double cdc3 = clusters[k].calculateClosestDistanceToCluster(resultpoint);
+
+              if (cdc2 < minDistance) {
+                minDistance = cdc2;
+                idxClosestIntersection = k;
+                pointClosestIntersection = Eigen::Vector3d{resultpoint[0], resultpoint[1], resultpoint[2]};
+
+                cdc1Dbg = cdc1;
+                cdc2Dbg = cdc2;
+                cdc3Dbg = cdc3;
+              }
+
+            }
+          }
+
+          if (idxClosestIntersection == -1) { std::cout << "ERROR: We did not find a suitable intersection :(:(:(:("; break;}
+
+          clusters[i].intersectionsPoints.push_back(pointClosestIntersection);
+          clusters[idxCurrentWall].intersectionsPoints.push_back(pointClosestIntersection);
+          clusters[idxClosestIntersection].intersectionsPoints.push_back(pointClosestIntersection);
+
+
+          std::cout << "Clostest distances: " << cdc1Dbg << ", " << cdc2Dbg << ", " << cdc3Dbg;
+          std::cout << "found intersection between: " << i << "," << idxCurrentWall << "," << idxClosestIntersection << ", " << "point: ";
+          printMyVec(pointClosestIntersection);
+          std::cout << "\n";
+
+          intersectPoints.conservativeResize(intersectPoints.rows(), intersectPoints.cols()+1);
+          intersectPoints.col(intersectPoints.cols()-1) = pointClosestIntersection;
+          colors.push_back(colorRed);
+
+          checkedWalls.push_back(idxClosestIntersection);
+        }
+
+        /*for (int j : wallClusters) {
+          for (int k : wallClusters) {
+            if (k == j) continue;
+            Eigen::Vector3d resultpoint;
+            if (RoomCReconstruction::intersect3Clusters(
+              clusters[i], clusters[j], clusters[k], resultpoint)) {
+              double dc1 = clusters[i].calcDistanceToCenter(resultpoint);
+              double dc2 = clusters[j].calcDistanceToCenter(resultpoint);
+              double dc3 = clusters[k].calcDistanceToCenter(resultpoint);
+
+              double cdc1 = clusters[i].calculateClosestDistanceToCluster(resultpoint);
+              double cdc2 = clusters[j].calculateClosestDistanceToCluster(resultpoint);
+              double cdc3 = clusters[k].calculateClosestDistanceToCluster(resultpoint);
+
+
+              if (cdc1 <= 40 &&
+                  cdc2 <= 40 &&
+                  cdc3 <= 40) {
+
+                clusters[i].intersectionsPoints.push_back(resultpoint);
+                clusters[j].intersectionsPoints.push_back(resultpoint);
+                clusters[k].intersectionsPoints.push_back(resultpoint);
+
+
+                std::cout << "Clostest distances: " << cdc1 << ", " << cdc2 << ", " << cdc3;
+                std::cout << "found intersection between: " << i << "," << j << "," << k << ", " << "point: ";
+                printMyVec(resultpoint);
+                std::cout << "\n";
+
+                intersectPoints.conservativeResize(intersectPoints.rows(), intersectPoints.cols()+1);
+                intersectPoints.col(intersectPoints.cols()-1) = resultpoint;
+                //Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(intersectPoints.rows(), intersectPoints.cols() + 1);
+                colors.push_back(colorRed);
+              }
+            }
+          }
+        }*/
+
+
+
+      }
+
+
+      // For every cluster that has at least 4 intersection-points, take the first 4 intersection-points and create a plane
+      std::vector< std::vector <Eigen::Vector3d>> realpoints;
+      for (int i = 0; i < clusters.size(); i++) {
+          if (clusters[i].intersectionsPoints.size() < 4) continue;
+        realpoints.emplace_back(clusters[i].intersectionsPoints);
+      }
+
+      RoomCReconstruction::createPlanarRoom("interpolation_method.ply", realpoints);
+
+
+      Eigen::Matrix<double, 3, Eigen::Dynamic> printMat(points.rows(), points.cols() + intersectPoints.cols());
+      printMat << points, intersectPoints;
       TangentSpace::IO::write3DPointsWithColors("output_clustering.ply", printMat, colors);
 
       RoomCReconstruction::createPlanarRoom("planification_method.ply", filledRectanglesResult);
@@ -401,17 +485,50 @@ namespace RoomCReconstruction {
 
 
     // Doesn't work very well
-    /*std::array<Eigen::Vector2d, 2> calculateWallBoundaries(const Cluster& wallcluster) {
-      double maxX, maxY = std::numeric_limits<double>::min();
-      double minX, minY = std::numeric_limits<double>::max();
+    std::array<Eigen::Vector2d, 2> calculateWallBoundaries(const Cluster& wallcluster) {
+
+      Eigen::Vector2d perpVec = Eigen::Vector2d(wallcluster.normal[0], wallcluster.normal[1]);
+      Eigen::Rotation2D<double> rotationMatrix(0.5*std::numbers::pi_v<double>);
+      Eigen::Vector2d linevec = rotationMatrix * perpVec;
+
+      int comparisonInt = abs(linevec[0]) > abs(linevec[1]) ? 0:1;
+
+      double maxX = std::numeric_limits<double>::lowest();
+      //double maxY = std::numeric_limits<double>::lowest();
+      double minX = std::numeric_limits<double>::max();
+      //double minY = std::numeric_limits<double>::max();
+
+      Eigen::Vector3d leftmost_point;
+      Eigen::Vector3d rightmost_point;
 
       for (const Eigen::Vector3d& p : wallcluster.pointsReal) {
-        if (p[0] > maxX) maxX = p[0];
-        if (p[0] < minX) minX = p[0];
-        if (p[1] > maxY) maxY = p[1];
-        if (p[1] < minY) minY = p[1];
+        if (p[comparisonInt] > maxX) { maxX = p[comparisonInt]; rightmost_point = p; }
+        if (p[comparisonInt] < minX) { minX = p[comparisonInt]; leftmost_point = p; }
+        //if (p[1] > maxY) { maxY = p[1]; }
+        //if (p[1] < minY) { minY = p[1]; }
       }
-      return {Eigen::Vector2d{maxX, maxY}, Eigen::Vector2d{minX, minY}};
-    }*/
+
+
+
+      //std::cout << "X: [" << maxX << ", " << maxY << "], Y: [" << minX << ", " << minY << "]";
+
+      return {Eigen::Vector2d{leftmost_point[0], leftmost_point[1]}, Eigen::Vector2d{rightmost_point[0], rightmost_point[1]}};
+    }
+
+
+
+    std::vector<Cluster> divideIntoSeparateClusters(const Cluster& cluster) {
+      std::vector<Cluster> separateClusters;
+
+
+      for (const auto& p : cluster.pointsReal) {
+
+
+
+
+      }
+
+
+    }
 
 }

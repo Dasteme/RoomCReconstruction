@@ -28,6 +28,15 @@ namespace RoomCReconstruction {
     TangentSpace::IO::write3DPointsWithColors(filename, outputMatrix, colors);
 
   }
+  std::vector<Eigen::Vector3d> simple2Dto3D(std::vector<Eigen::Vector2d>& points2d) {
+    std::vector<Eigen::Vector3d> points3d;
+    for (int i = 0; i < points2d.size(); i++) {
+      points3d.push_back(Eigen::Vector3d{points2d[i].x(), points2d[i].y(), 0});
+    }
+    return points3d;
+  }
+
+
 
 
   double safe_acos(double value) {

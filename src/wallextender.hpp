@@ -44,7 +44,7 @@ namespace RoomCReconstruction {
 
         ClusterContour contour;
         double max_distance;
-        double max_top = std::numeric_limits<double>::min();
+        double max_top = std::numeric_limits<double>::lowest();
         double max_bot = std::numeric_limits<double>::max();
 
         std::vector <Eigen::Vector3d> intersectionsPoints;
@@ -205,7 +205,6 @@ namespace RoomCReconstruction {
 
 
 
-
     class RecursiveRectangle {
     public:
       enum fillState {notDetermined, special, notFilled, filled};
@@ -341,7 +340,7 @@ namespace RoomCReconstruction {
     void planifyCluster(const Cluster& cluster, std::vector<std::vector <Eigen::Vector3d>>& filledRectangles, const double avg_spacing);
     std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector3d> pointsReal);
     std::vector<Eigen::Vector3d> transform2DToPlanePoints(Eigen::Vector3d normal, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2, std::vector <Eigen::Vector2d> points);
-    //std::array<Eigen::Vector2d, 2> calculateWallBoundaries(const Cluster& wallcluster);
+    std::array<Eigen::Vector2d, 2> calculateWallBoundaries(const Cluster& wallcluster);
 
 
     void

@@ -26,7 +26,7 @@ namespace RoomCReconstruction {
     std::uint32_t current_ind_offset = 0;
 
     for (int i = 0; i < intersectionsPoints.size(); i++) {
-      for (int j = 0; j < 4; j++) {
+      for (int j = 0; j < intersectionsPoints[i].size(); j++) {
         flat_vertices.emplace_back(intersectionsPoints[i][j].x(),
                                    intersectionsPoints[i][j].y(),
                                    intersectionsPoints[i][j].z());
@@ -34,12 +34,12 @@ namespace RoomCReconstruction {
 
       }
       // Add indices
-      for (const auto &face : getFaces(intersectionsPoints[i])) {
+      for (const auto &face : getFacesConvexPolygon(intersectionsPoints[i])) {
         flat_indices.emplace_back(current_ind_offset + face.i0,
                                   current_ind_offset + face.i1,
                                   current_ind_offset + face.i2);
       }
-      current_ind_offset += static_cast<std::uint32_t>(4);
+      current_ind_offset += static_cast<std::uint32_t>(intersectionsPoints[i].size());
     }
 
 
@@ -79,6 +79,65 @@ namespace RoomCReconstruction {
   }
 
 
+  // Every 2 point form an edge
+  void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> intersectionsPoints) {
+
+    std::vector<vertex> edge_vertices;
+    std::vector<edge_indices> edge_indices;
+
+
+    std::uint32_t current_ind_offset = 0;
+
+    for (int i = 0; i < intersectionsPoints.size(); i++) {
+
+      edge_vertices.emplace_back(intersectionsPoints[i].x(),
+                                 intersectionsPoints[i].y(),
+                                 intersectionsPoints[i].z());
+
+      if (i%2 == 1) {
+        edge_indices.emplace_back(current_ind_offset,
+                                  current_ind_offset + 1);
+        current_ind_offset += 2;
+      }
+
+    }
+
+
+
+    tinyply::PlyFile file;
+    file.add_properties_to_element(
+      "vertex",
+      {"x", "y", "z"},
+      tinyply::Type::FLOAT64,
+      edge_vertices.size(),
+      reinterpret_cast<std::uint8_t*>(edge_vertices.data()),
+      tinyply::Type::INVALID,
+      0);
+
+    file.add_properties_to_element(
+      "edge",
+      {"vertex1", "vertex2"},
+      tinyply::Type::INT32,
+      edge_indices.size(),
+      reinterpret_cast<std::uint8_t*>(edge_indices.data()),
+      tinyply::Type::INVALID,
+      0);
+
+
+
+    std::filebuf fb_binary;
+    fb_binary.open(filename, std::ios::out | std::ios::binary);
+    if (!fb_binary.is_open()) {
+      throw std::runtime_error {"Failed to open file buffer for " + filename};
+    }
+    std::ostream outstream_binary{ &fb_binary };
+    if (outstream_binary.fail()) {
+      throw std::runtime_error{ "Failed to open output binary stream for " + filename };
+    }
+    file.write(outstream_binary, true);
+  }
+
+
 
   // Takes 4 points as input and determines 2 faces to fill up the area spanned be the 4 points.
   //
@@ -104,6 +163,23 @@ namespace RoomCReconstruction {
 
     }
   }
+
+  // Takes 4 or more points as input and creates
+  //
+  //
+  std::vector<face_indices> getFacesConvexPolygon(std::vector <Eigen::Vector3d> points) {
+    std::vector<face_indices> result;
+    for (std::uint32_t i = 0; i < points.size(); i++) {
+      for (std::uint32_t j = 0; j < points.size(); j++) {
+        for (std::uint32_t k = 0; k < points.size(); k++) {
+          result.push_back({i,j,k});
+        }
+      }
+    }
+  return result;
+  }
+
+
 
 
 }
