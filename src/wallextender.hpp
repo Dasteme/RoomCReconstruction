@@ -41,10 +41,11 @@ namespace RoomCReconstruction {
 
         std::vector <size_t> points;
         std::vector <Eigen::Vector3d> pointsReal;
+        std::vector <Eigen::Vector3d> pointsNormals;
 
+
+        bool mergedCluster = false;
         double max_distance;
-        double max_top = std::numeric_limits<double>::lowest();
-        double max_bot = std::numeric_limits<double>::max();
 
         std::vector <Eigen::Vector3d> intersectionsPoints;
 
@@ -55,26 +56,33 @@ namespace RoomCReconstruction {
         }
 
 
-        bool checkAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex) {
-            double distance = (point - center).dot(normal);
-            double gaussian_distance = gaussian_1d(distance, 1.0, 0.0, 4);
-            double angle = safe_acos(normal.dot(pointNormal) / (normal.norm() * pointNormal.norm()));
-            double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 12);
+        bool checkAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal) {
+          double distance = (point - center).dot(normal);
+          double gaussian_distance = gaussian_1d(distance, 1.0, 0.0, 4);
+          double angle = safe_acos(normal.dot(pointNormal) / (normal.norm() * pointNormal.norm()));
+          double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 12);
 
-            /*if (distance2 < 6 && distance2 > 3) {
-                std::cout << "Distance: " << distance2 << " becomes: " << gaussian_distance << "\n";
-            }*/
+          /*if (distance2 < 6 && distance2 > 3) {
+              std::cout << "Distance: " << distance2 << " becomes: " << gaussian_distance << "\n";
+          }*/
 
-            if (gaussian_distance > 0.8 && gaussian_angle > 0.7) {
-                points.push_back(pointIndex);
-                pointsReal.push_back(point);
-                updateCenter(point);
-                updateNormal(pointNormal);
-                updateBotTop(point);
+          return (gaussian_distance > 0.8 && gaussian_angle > 0.7);
+        }
 
-                return true;
-            }
-            return false;
+        void Add(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex) {
+          points.push_back(pointIndex);
+          pointsReal.push_back(point);
+          pointsNormals.push_back(pointNormal);
+          updateCenter(point);
+          updateNormal(pointNormal);
+        }
+
+        bool checkAndAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex) {
+          if (checkAdd(point, pointNormal)) {
+            Add(point, pointNormal, pointIndex);
+            return true;
+          }
+          return false;
         }
 
 
@@ -90,11 +98,6 @@ namespace RoomCReconstruction {
             normal = ((normal * (points.size() - 1) + newNormal) / points.size()).normalized();
             //std::cout << "Center is now: " << "[" << center.x() << "," << center.y() << "," << center.z() << "]" << "\n";
 
-        }
-
-        void updateBotTop(const Eigen::Vector3d& p) {
-          if (p[2] > max_top) max_top = p[2];
-          if (p[2] < max_bot) max_bot = p[2];
         }
 
 
@@ -129,24 +132,171 @@ namespace RoomCReconstruction {
         }
 
 
+        void tryMergeCluster(Cluster& toMergeCluster) {
+          if(checkAdd(toMergeCluster.center, toMergeCluster.normal)) {
+            for (int i = 0; i < toMergeCluster.points.size(); i++) {
+              Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
+
+            }
+            toMergeCluster.mergedCluster = true;
+          }
+        }
 
 
+    };
+
+
+    class Walledge {
+    public:
+      Eigen::Vector2d p1;
+      Eigen::Vector2d p2;
+
+      Walledge(Eigen::Vector2d p1_p, Eigen::Vector2d p2_p) : p1(p1_p),p2(p2_p) {
+
+      };
 
     };
 
 
 
 
-    /*void printV(Eigen::Vector3d vec) {
-        std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
-    }*/
 
+    class WalledgeIntersection {
+    public:
+      Walledge wall1;
+      Walledge wall2;
+      Eigen::Vector2d intersectionPoint;
+
+      bool hasIntersection = false;
+
+
+      // Further information used for combining walls
+      enum intersectionLocation {middle, first, second};    // middle: on the line, fist: closer to first point
+      intersectionLocation wall1loc;
+      intersectionLocation wall2loc;
+      size_t distWall1;
+      size_t distWall2;
+
+
+      WalledgeIntersection(Walledge e1_p, Walledge e2_p) : wall1(e1_p), wall2(e2_p) {
+        intersect2dLines(wall1, wall2, intersectionPoint);
+
+        double dist_w1p1 = (wall1.p1 - intersectionPoint).norm();
+        double dist_w1p2 = (wall1.p2 - intersectionPoint).norm();
+        double dist_w2p1 = (wall2.p1 - intersectionPoint).norm();
+        double dist_w2p2 = (wall2.p2 - intersectionPoint).norm();
+
+        double dist_w1 = std::min(dist_w1p1, dist_w1p2);
+        double dist_w2 = std::min(dist_w2p1, dist_w2p2);
+
+        if (dist_w1 < 100 && dist_w2 < 100) {
+          hasIntersection = true;
+
+          double len_w1 = (wall1.p2 - wall1.p1).norm();
+          double len_w2 = (wall2.p2 - wall2.p1).norm();
+
+          // Point lies on the wall iff the distance from intersection->p1 and intersection->p2
+          // are smaller than the length of the wall.
+          wall1loc = (dist_w1p1 <= len_w1 && dist_w1p2 <= len_w1) ? middle:((dist_w1p1 < dist_w1p2) ? first:second);
+          wall2loc = (dist_w2p1 <= len_w2 && dist_w2p2 <= len_w2) ? middle:((dist_w2p1 < dist_w2p2) ? first:second);
+
+          // If intersectionpoint lies on wall1, it also must lie on wall2
+          assert((wall1loc == middle && wall2loc == middle) || (wall1loc != middle && wall2loc != middle));
+
+          distWall1 = (wall1loc == middle) ? 0:(wall1loc == first) ? dist_w1p1:dist_w1p2;
+          distWall2 = (wall2loc == middle) ? 0:(wall2loc == first) ? dist_w2p1:dist_w2p2;
+        }
+
+        //std::cout << "Intersction at: " << intersectionPoint << "\n";
+
+
+      }
+
+      friend std::ostream& operator<<(std::ostream& os, WalledgeIntersection const & wei) {
+        return os << "["<< wei.wall1.p1[0] << "," << wei.wall1.p1[1]  << " and " << wei.wall1.p2[0] << "," << wei.wall1.p2[1] << "]" <<
+          "["<< wei.wall2.p1[0] << "," << wei.wall2.p1[1]  << " and " << wei.wall2.p2[0] << "," << wei.wall2.p2[1] << "]" <<
+          " with: " << "w1:" << "[" << wei.wall1loc << ":" << wei.distWall1 << "]" << ", w2: " << "[" << wei.wall2loc << ":" << wei.distWall2 << "]";
+      }
+
+      bool intersect2dLines(Walledge e1, Walledge e2, Eigen::Vector2d& intersectionPoint) {
+        Eigen::Vector2d A = e1.p1;
+        Eigen::Vector2d B = e1.p2;
+        Eigen::Vector2d C = e2.p1;
+        Eigen::Vector2d D = e2.p2;
+
+        // Line from e1 (AB) represented as a1x + b1y = c1
+        double a1 = B[1] - A[1];
+        double b1 = A[0] - B[0];
+        double c1 = a1*(A[0]) + b1*(A[1]);
+
+        // Line from e2 (CD) represented as a2x + b2y = c2
+        double a2 = D[1] - C[1];
+        double b2 = C[0] - D[0];
+        double c2 = a2*(C[0]) + b2*(C[1]);
+
+        double determinant = a1*b2 - a2*b1;
+
+        if (abs(determinant) < DBL_EPSILON) {
+          return false;
+        } else {
+          double x = (b2*c1 - b1*c2) / determinant;
+          double y = (a1*c2 - a2*c1) / determinant;
+          intersectionPoint = Eigen::Vector2d{x,y};
+          return true;
+        }
+      }
+
+
+    };
+
+
+    class WalledgeWithIntersections;
+
+    class XX {
+    public:
+      size_t interpolationDistace;
+      Eigen::Vector2d intersectionPoint;
+      WalledgeWithIntersections* otherWall;
+    };
+
+
+    class WalledgeWithIntersections {
+    public:
+      Walledge wall;
+      std::vector<XX*> middleIntersections;
+      std::vector<XX*> firstIntersections;
+      std::vector<XX*> secondIntersections;
+    };
+
+    class YY {
+    public:
+      Walledge walledge;
+
+
+    };
+
+
+    class Wallcombiner {
+    public:
+      std::vector<XX> combis;
+
+      Wallcombiner(size_t numberOfWalls) : combis(numberOfWalls) {
+
+
+      }
+
+      void addWalledgeIntersection(WalledgeIntersection wei) {
+
+      }
+
+
+    };
 
     bool intersect3Clusters(Cluster cluster1, Cluster cluster2, Cluster cluster3, Eigen::Vector3d& resultPoint);
 
 
-   std::array<Eigen::Vector2d, 2> calculateWallBoundaries(const Cluster& wallcluster);
-
+   Walledge calculateWallBoundaries(const Eigen::Vector2d& linevec, const std::vector<Eigen::Vector3d>& points);
+   bool checkWallBotTop(const std::vector<Eigen::Vector3d>& points, double floorLevel, double ceilingLevel);
 
     void
     extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,

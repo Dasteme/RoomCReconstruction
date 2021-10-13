@@ -123,6 +123,25 @@ namespace RoomCReconstruction {
       tinyply::Type::INVALID,
       0);
 
+/*
+    std::vector <std::array<unsigned char, 3>> colors1(
+      edge_vertices.size(), std::array < unsigned char, 3 > {0});
+    colors1[0] = {255, 0, 0};
+    colors1[1] = {255, 0, 0};
+    colors1[2] = {0, 0, 255};
+    colors1[3] = {0, 0, 255};
+
+
+    file.add_properties_to_element(
+      "vertex",
+      {"red", "green", "blue"},
+      tinyply::Type::UINT8,
+      colors1.size(),
+      const_cast<unsigned char*>(colors1.front().data()),
+      tinyply::Type::INVALID,
+      0);*/
+
+
 
 
     std::filebuf fb_binary;

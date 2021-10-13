@@ -23,7 +23,7 @@ namespace RoomCReconstruction {
     void extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
                          const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing) {
 
-        std::cout << "extending wallpoint";
+        std::cout << "extending wallpoint\n";
 
 
 
@@ -50,9 +50,9 @@ namespace RoomCReconstruction {
 
             bool found = false;
             for (int j = 0; j != clusters.size(); j++) {
-                if (clusters[j].checkAdd(points.col(static_cast<Eigen::Index>(i)), local_pcas[i].local_base.col(2),
-                                         i)) {
-                    //colors[i] = clusters[j].color;
+                if (clusters[j].checkAndAdd(
+                    points.col(static_cast<Eigen::Index>(i)), local_pcas[i].local_base.col(2), i)) {
+                    colors[i] = clusters[j].color;
                     found = true;
                     break;
                 }
@@ -66,11 +66,11 @@ namespace RoomCReconstruction {
             }
         }
 
-        std::cout << clusters.size() << "\n";
+        std::cout << "Found " << clusters.size() << " Clusters\n";
 
-        for (int i = 0; i < clusters.size(); i++) {
+        /*for (int i = 0; i < clusters.size(); i++) {
             std::cout << "Cluster " << i << ": #points: " << clusters[i].points.size();
-        }
+        }*/
 
         // Remove small clusters
         for (auto it = clusters.begin(); it != clusters.end(); it++) {
@@ -78,6 +78,23 @@ namespace RoomCReconstruction {
             clusters.erase(it--);
           }
         }
+
+
+        // Merge similar clusters
+
+        /*for (int i = 0; i < clusters.size(); i++) {
+          for (int j = i+1; j < clusters.size(); j++) {
+            Cluster& biggerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[i]:clusters[j];
+            Cluster& smallerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[j]:clusters[i];
+            std::cout << biggerC.mergedCluster;
+            biggerC.tryMergeCluster(smallerC);
+          }
+        }*/
+        /*for (auto it = clusters.begin(); it != clusters.end(); it++) {
+          if ((*it).mergedCluster) {
+            clusters.erase(it--);
+          }
+        }*/
 
 
         //
@@ -135,14 +152,15 @@ namespace RoomCReconstruction {
         }
       }
 
-      std::vector<Eigen::Vector2d> floorEdgesPoints;
+      std::vector<Walledge> floorEdges;
+
 
       int debugCounter = 10;
 
       //Search wall clusters
       std::vector<int> wallClusters;
       for (int i = 0; i < clusters.size(); i++) {
-        if ((abs(clusters[i].normal[2]) < 0.01) && abs(ceilingLevel - clusters[i].max_top) < 25 && abs(floorLevel - clusters[i].max_bot) < 25) {
+        if ((abs(clusters[i].normal[2]) < 0.01) && checkWallBotTop(clusters[i].pointsReal, floorLevel, ceilingLevel)) {
 
 
           wallClusters.push_back(i);
@@ -154,17 +172,164 @@ namespace RoomCReconstruction {
               colors[clusters[i].points[k]] = clusters[i].color;
             }
 
-          std::array<Eigen::Vector2d, 2> edge = calculateWallBoundaries(clusters[i]);
-          floorEdgesPoints.push_back(edge[0]);
-          floorEdgesPoints.push_back(edge[1]);
+
+          Eigen::Vector2d perpVec = Eigen::Vector2d(clusters[i].normal[0], clusters[i].normal[1]);
+          Eigen::Rotation2D<double> rotationMatrix(0.5*std::numbers::pi_v<double>);
+          Eigen::Vector2d linevec = rotationMatrix * perpVec;
+
+          Walledge edge = calculateWallBoundaries(linevec, clusters[i].pointsReal);
+          Eigen::Vector2d wallLine = edge.p2 - edge.p1;
+
+          constexpr size_t partSize = 1;
+
+          const size_t t = ceil(wallLine.norm() / partSize);
+          std::cout << "t is: " << t << "\n";
+          std::vector<std::vector<Eigen::Vector3d>> walllineParts(t);
+
+          for (Eigen::Vector3d p : clusters[i].pointsReal) {
+            Eigen::Vector2d p_2d = Eigen::Vector2d{p[0], p[1]};
+            double dist = (p_2d - edge.p1).norm();
+            double location = (int) floor(dist / partSize);
+            if (location >= t) {location = t-1;}    // May happen in extreme cases
+            walllineParts[location].push_back(p);
+          }
+
+
+
+          std::vector<Eigen::Vector3d> edgeIteratorPoints;
+          for (int k = 0; k < t; k++) {
+            if (walllineParts[k].size() > 0) {
+              edgeIteratorPoints.insert(edgeIteratorPoints.end(), walllineParts[k].begin(), walllineParts[k].end());
+            } else {
+              if (checkWallBotTop(edgeIteratorPoints, floorLevel, ceilingLevel)) {
+                Walledge partEdge = calculateWallBoundaries(linevec, edgeIteratorPoints);
+                floorEdges.push_back(partEdge);
+              }
+
+              edgeIteratorPoints.clear();
+            }
+            std::cout << (walllineParts[k].size() > 0 ? "#":"_");
+          }
+          if (edgeIteratorPoints.size() > 0) {
+            if (checkWallBotTop(edgeIteratorPoints, floorLevel, ceilingLevel)) {
+              Walledge partEdge = calculateWallBoundaries(linevec, edgeIteratorPoints);
+              floorEdges.push_back(partEdge);
+            }
+
+            edgeIteratorPoints.clear();
+          }
+
+
+          std::cout << "\n\n";
+
+
+
+
+
+          //floorEdgesPoints.push_back(edge[0]);
+          //floorEdgesPoints.push_back(edge[1]);
 
           //}
 
         }
       }
 
-      write2Dpoints("floorEdges.ply", floorEdgesPoints);
+      Wallcombiner myCombiner(floorEdges.size());
+
+      std::vector<WalledgeIntersection> wallIntersections;
+      for (int i = 0; i < floorEdges.size(); i++) {
+        for (int j = i+1; j < floorEdges.size(); j++) {
+          wallIntersections.push_back(WalledgeIntersection(floorEdges[i], floorEdges[j]));
+        }
+      }
+
+
+
+      // Start with the biggest wall
+      Walledge currentWall = floorEdges[0];
+      for (Walledge we : floorEdges) {
+        if ((we.p1 - we.p2).norm() > (currentWall.p1 - currentWall.p2).norm()) {
+          currentWall = we;
+        }
+      }
+      Walledge startingWall = currentWall;
+      std::vector<WalledgeIntersection*> myCombinations;
+
+      Eigen::Vector2d currentIPoint;
+      Walledge nextWallProposal = currentWall;  // Just something s.t. it works
+      int currentComingFrom = 0;
+      int nextComingFrom = 0;
+      std::vector<Eigen::Vector2d> takenIntersectionPoints;
+
+
+      while(true) {
+        std::cout << "CurrentWall: " << "["<< currentWall.p1[0] << "," << currentWall.p1[1]  << " and " << currentWall.p2[0] << "," << currentWall.p2[1] << "]\n";
+
+        size_t smallestIntersectionDistance = std::numeric_limits<size_t>::max();
+        for (WalledgeIntersection wi : wallIntersections) {
+          //std::cout << "    smallest dist: " << smallestIntersectionDistance << "\n";
+
+          if (!wi.hasIntersection) continue;
+          if (wi.wall1.p1 == currentWall.p1 && wi.wall1.p2 == currentWall.p2) { // if wi.wall1 == currentWall
+            if ((wi.distWall1 + wi.distWall2) < smallestIntersectionDistance && wi.wall1loc != currentComingFrom && wi.wall1loc != 0 && wi.wall2loc != 0) {
+              currentIPoint = wi.intersectionPoint;
+              nextWallProposal = wi.wall2;
+              nextComingFrom = wi.wall2loc;
+              smallestIntersectionDistance = wi.distWall1 + wi.distWall2;
+              std::cout << "1. New smaller Intersection: " << wi << "\n";
+            }
+          }
+
+          if (wi.wall2.p1 == currentWall.p1 && wi.wall2.p2 == currentWall.p2) { // if wi.wall1 == currentWall
+            if ((wi.distWall1 + wi.distWall2) < smallestIntersectionDistance && wi.wall2loc != currentComingFrom && wi.wall1loc != 0 && wi.wall2loc != 0) {
+              currentIPoint = wi.intersectionPoint;
+              nextWallProposal = wi.wall1;
+              nextComingFrom = wi.wall1loc;
+              smallestIntersectionDistance = wi.distWall1 + wi.distWall2;
+              std::cout << "2. New smaller Intersection: " << wi << "\n";
+            }
+          }
+        }
+
+        takenIntersectionPoints.push_back(currentIPoint);
+        currentWall = nextWallProposal;
+
+        currentComingFrom = nextComingFrom;
+        std::cout << "Coming from direction: " << currentComingFrom << "\n";
+
+        if (startingWall.p1 == currentWall.p1 && startingWall.p2 == currentWall.p2) break;
+      };
+
+
+
+
+      std::vector<Eigen::Vector2d> floorEdgesPoints;
+      for (Walledge e : floorEdges) {
+        floorEdgesPoints.push_back(e.p1);
+        floorEdgesPoints.push_back(e.p2);
+      }
+
+      std::vector<Eigen::Vector2d> floorIntersectionPoints;
+      for (WalledgeIntersection wi : wallIntersections) {
+        if (wi.hasIntersection) {
+          floorIntersectionPoints.push_back(wi.intersectionPoint);
+        }
+
+      }
+
+      std::vector<Eigen::Vector2d> takenEdges;
+
+      for (int i = 0; i < takenIntersectionPoints.size(); i++) {
+        takenEdges.push_back(takenIntersectionPoints[i]);
+        takenEdges.push_back(takenIntersectionPoints[(i+1 >= takenIntersectionPoints.size()) ? 0:(i+1)]);
+      }
+      //takenEdges.push_back(takenIntersectionPoints[takenIntersectionPoints.size()]);
+      //takenEdges.push_back(takenIntersectionPoints[0]);
+
+      write2Dpoints("intersecPoints123245.ply", floorIntersectionPoints);
+      write2Dpoints("intersecPoints123245Taken.ply", takenIntersectionPoints);
       writeEdges("floorEdgesLines12345.ply", simple2Dto3D(floorEdgesPoints));
+      writeEdges("myEDGES12345.ply", simple2Dto3D(takenEdges));
 
       std::cout << "ClusterIndex: " << idxFloorCluster;
       /*if (idxFloorCluster != -1) {
@@ -286,11 +451,7 @@ namespace RoomCReconstruction {
 
 
     // Doesn't work very well
-    std::array<Eigen::Vector2d, 2> calculateWallBoundaries(const Cluster& wallcluster) {
-
-      Eigen::Vector2d perpVec = Eigen::Vector2d(wallcluster.normal[0], wallcluster.normal[1]);
-      Eigen::Rotation2D<double> rotationMatrix(0.5*std::numbers::pi_v<double>);
-      Eigen::Vector2d linevec = rotationMatrix * perpVec;
+    Walledge calculateWallBoundaries(const Eigen::Vector2d& linevec, const std::vector<Eigen::Vector3d>& points) {
 
       int comparisonInt = abs(linevec[0]) > abs(linevec[1]) ? 0:1;
 
@@ -302,7 +463,7 @@ namespace RoomCReconstruction {
       Eigen::Vector3d leftmost_point;
       Eigen::Vector3d rightmost_point;
 
-      for (const Eigen::Vector3d& p : wallcluster.pointsReal) {
+      for (const Eigen::Vector3d& p : points) {
         if (p[comparisonInt] > maxX) { maxX = p[comparisonInt]; rightmost_point = p; }
         if (p[comparisonInt] < minX) { minX = p[comparisonInt]; leftmost_point = p; }
         //if (p[1] > maxY) { maxY = p[1]; }
@@ -313,8 +474,22 @@ namespace RoomCReconstruction {
 
       //std::cout << "X: [" << maxX << ", " << maxY << "], Y: [" << minX << ", " << minY << "]";
 
-      return {Eigen::Vector2d{leftmost_point[0], leftmost_point[1]}, Eigen::Vector2d{rightmost_point[0], rightmost_point[1]}};
+      return Walledge{Eigen::Vector2d{leftmost_point[0], leftmost_point[1]}, Eigen::Vector2d{rightmost_point[0], rightmost_point[1]}};
     }
+
+
+    bool checkWallBotTop(const std::vector<Eigen::Vector3d>& points, double floorLevel, double ceilingLevel) {
+      double max_top = std::numeric_limits<double>::lowest();
+      double max_bot = std::numeric_limits<double>::max();
+
+      for (const Eigen::Vector3d& p : points) {
+        if (p[2] > max_top) max_top = p[2];
+        if (p[2] < max_bot) max_bot = p[2];
+      }
+
+      return abs(ceilingLevel - max_top) < 20 && abs(floorLevel - max_bot) < 150;
+    }
+
 
 
 
