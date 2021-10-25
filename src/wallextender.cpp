@@ -326,10 +326,9 @@ namespace RoomCReconstruction {
       //takenEdges.push_back(takenIntersectionPoints[takenIntersectionPoints.size()]);
       //takenEdges.push_back(takenIntersectionPoints[0]);
 
-      write2Dpoints("intersecPoints123245.ply", floorIntersectionPoints);
-      write2Dpoints("intersecPoints123245Taken.ply", takenIntersectionPoints);
-      writeEdges("floorEdgesLines12345.ply", simple2Dto3D(floorEdgesPoints));
-      writeEdges("myEDGES12345.ply", simple2Dto3D(takenEdges));
+      write2Dpoints("A_AllFloorIntersections.ply", floorIntersectionPoints);
+      writeEdges("A_AllFloorEdges.ply", simple2Dto3D(floorEdgesPoints));
+      writeEdges("A_InterpolatedFloorEdges.ply", simple2Dto3D(takenEdges));
 
       std::cout << "ClusterIndex: " << idxFloorCluster;
       /*if (idxFloorCluster != -1) {
