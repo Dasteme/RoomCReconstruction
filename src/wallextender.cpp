@@ -46,7 +46,7 @@ namespace RoomCReconstruction {
                     lambda_1, lambda_2, 1.0, 0.5, 0.5, 0.2, 0.2)};
 
             // Go to next point if Score is too low
-            if (planarPointScore < 0.9) continue;
+            if (planarPointScore < 0.995) continue;
 
             bool found = false;
             for (int j = 0; j != clusters.size(); j++) {
@@ -89,8 +89,8 @@ namespace RoomCReconstruction {
             std::cout << biggerC.mergedCluster;
             biggerC.tryMergeCluster(smallerC);
           }
-        }*/
-        /*for (auto it = clusters.begin(); it != clusters.end(); it++) {
+        }
+        for (auto it = clusters.begin(); it != clusters.end(); it++) {
           if ((*it).mergedCluster) {
             clusters.erase(it--);
           }
@@ -168,9 +168,9 @@ namespace RoomCReconstruction {
 
 
           //if (debugCounter-- <= 0) {
-            for (int k = 0; k < clusters[i].points.size(); k++) {
-              colors[clusters[i].points[k]] = clusters[i].color;
-            }
+            /*for (int k = 0; k < clusters[i].points.size(); k++) {
+              colors[clusters[i].points[k]] = colorGreen;
+            }*/
 
 
           Eigen::Vector2d perpVec = Eigen::Vector2d(clusters[i].normal[0], clusters[i].normal[1]);
@@ -261,8 +261,9 @@ namespace RoomCReconstruction {
       int nextComingFrom = 0;
       std::vector<Eigen::Vector2d> takenIntersectionPoints;
 
-
+      int maxIterations = 200;
       while(true) {
+        maxIterations--;
         std::cout << "CurrentWall: " << "["<< currentWall.p1[0] << "," << currentWall.p1[1]  << " and " << currentWall.p2[0] << "," << currentWall.p2[1] << "]\n";
 
         size_t smallestIntersectionDistance = std::numeric_limits<size_t>::max();
@@ -298,6 +299,7 @@ namespace RoomCReconstruction {
         std::cout << "Coming from direction: " << currentComingFrom << "\n";
 
         if (startingWall.p1 == currentWall.p1 && startingWall.p2 == currentWall.p2) break;
+        if (maxIterations <= 0) break;
       };
 
 
@@ -346,12 +348,17 @@ namespace RoomCReconstruction {
 
 
 
+
+
+
+
+
       Eigen::Matrix<double, 3, Eigen::Dynamic> intersectPoints(3, 0);
 
 
 
 
-      for (int i : {idxFloorCluster, idxCeilingCluster}) {
+      /*for (int i : {idxFloorCluster, idxCeilingCluster}) {
 
         std::vector<int> checkedWalls;
         checkedWalls.push_back(wallClusters[0]);     // Last element of this vector is current processed wall
@@ -421,7 +428,7 @@ namespace RoomCReconstruction {
         realpoints.emplace_back(clusters[i].intersectionsPoints);
       }
 
-      RoomCReconstruction::createPlanarRoom("interpolation_method.ply", realpoints);
+      RoomCReconstruction::createPlanarRoom("interpolation_method.ply", realpoints);*/
 
 
       Eigen::Matrix<double, 3, Eigen::Dynamic> printMat(points.rows(), points.cols() + intersectPoints.cols());
@@ -486,7 +493,7 @@ namespace RoomCReconstruction {
         if (p[2] < max_bot) max_bot = p[2];
       }
 
-      return abs(ceilingLevel - max_top) < 20 && abs(floorLevel - max_bot) < 150;
+      return abs(ceilingLevel - max_top) < 60 && abs(floorLevel - max_bot) < 170;
     }
 
 
