@@ -234,17 +234,45 @@ namespace RoomCReconstruction {
         }
       }
 
+
+      std::cout << "Now starting to combine walls ... \n";
+
       Wallcombiner myCombiner(floorEdges.size());
 
+      std::cout << "Creating wall-intersections - ";
       std::vector<WalledgeIntersection> wallIntersections;
       for (int i = 0; i < floorEdges.size(); i++) {
         for (int j = i+1; j < floorEdges.size(); j++) {
-          wallIntersections.push_back(WalledgeIntersection(floorEdges[i], floorEdges[j]));
+          //std::cout << "Creating Wall-Intersection - " << i << "," << j << "\n";
+
+          WalledgeIntersection wi = WalledgeIntersection(floorEdges[i], floorEdges[j]);
+          if (!wi.hasIntersection) { continue; }
+          wallIntersections.push_back(wi);
+
+          //std::cout << "finished\n";
+
+          //std::cout << i << "," << j << ": Pushing back intersectionInfo to wall\n";
+          //std::cout << wi << "\n";
+
+          // There is a major problem here... It works for ~100 iterations, then the loop stops.
+          // Very interestingly, the loop doesn't even stop here most of the time.
+          // The computer slows down after a couples of iterations, and 3-4 seconds later the exit code -1073740791 (0xC0000409) appears.
+          // I didn't find a solution, but I think that there is a memory leak somewhere.
+          //
+          //floorEdges[i].addIntersectionInfo(wi, wi.wall1loc);
+          //floorEdges[j].addIntersectionInfo(wi, wi.wall2loc);
+          //std::cout << "pushed!" << "\n\n";
         }
       }
+      std::cout << " finished\n";
 
 
 
+
+
+
+
+      std::cout << "Preparing combination - ";
       // Start with the biggest wall
       Walledge currentWall = floorEdges[0];
       for (Walledge we : floorEdges) {
@@ -253,55 +281,42 @@ namespace RoomCReconstruction {
         }
       }
       Walledge startingWall = currentWall;
-      std::vector<WalledgeIntersection*> myCombinations;
 
-      Eigen::Vector2d currentIPoint;
+
       Walledge nextWallProposal = currentWall;  // Just something s.t. it works
       int currentComingFrom = 0;
       int nextComingFrom = 0;
+      intersectionLocation currentSearchingDir = first;
+      intersectionLocation nextSearchingDir = first;
       std::vector<Eigen::Vector2d> takenIntersectionPoints;
+      std::cout << " finished\n";
 
+      std::cout << "Iterating over walls - ";
       int maxIterations = 200;
       while(true) {
         maxIterations--;
         std::cout << "CurrentWall: " << "["<< currentWall.p1[0] << "," << currentWall.p1[1]  << " and " << currentWall.p2[0] << "," << currentWall.p2[1] << "]\n";
 
-        size_t smallestIntersectionDistance = std::numeric_limits<size_t>::max();
-        for (WalledgeIntersection wi : wallIntersections) {
-          //std::cout << "    smallest dist: " << smallestIntersectionDistance << "\n";
-
-          if (!wi.hasIntersection) continue;
-          if (wi.wall1.p1 == currentWall.p1 && wi.wall1.p2 == currentWall.p2) { // if wi.wall1 == currentWall
-            if ((wi.distWall1 + wi.distWall2) < smallestIntersectionDistance && wi.wall1loc != currentComingFrom && wi.wall1loc != 0 && wi.wall2loc != 0) {
-              currentIPoint = wi.intersectionPoint;
-              nextWallProposal = wi.wall2;
-              nextComingFrom = wi.wall2loc;
-              smallestIntersectionDistance = wi.distWall1 + wi.distWall2;
-              std::cout << "1. New smaller Intersection: " << wi << "\n";
-            }
-          }
-
-          if (wi.wall2.p1 == currentWall.p1 && wi.wall2.p2 == currentWall.p2) { // if wi.wall1 == currentWall
-            if ((wi.distWall1 + wi.distWall2) < smallestIntersectionDistance && wi.wall2loc != currentComingFrom && wi.wall1loc != 0 && wi.wall2loc != 0) {
-              currentIPoint = wi.intersectionPoint;
-              nextWallProposal = wi.wall1;
-              nextComingFrom = wi.wall1loc;
-              smallestIntersectionDistance = wi.distWall1 + wi.distWall2;
-              std::cout << "2. New smaller Intersection: " << wi << "\n";
-            }
+        WalledgeIntersection* currentBestWi = NULL;
+        for (WalledgeIntersection& wi : wallIntersections) {
+          if (!wi.containsWall(currentWall)) continue;
+          if (wi.getWallLocation(currentWall) != currentSearchingDir) continue;
+          if (wi.getOppositeWallLocation(currentWall) == middle) continue;
+          if (!currentBestWi || wi.interpolatedDistance() < currentBestWi->interpolatedDistance()) {
+            currentBestWi = &wi;
           }
         }
 
-        takenIntersectionPoints.push_back(currentIPoint);
-        currentWall = nextWallProposal;
+        if (!currentBestWi) break;
 
-        currentComingFrom = nextComingFrom;
-        std::cout << "Coming from direction: " << currentComingFrom << "\n";
+        takenIntersectionPoints.push_back(currentBestWi->intersectionPoint);
+        currentSearchingDir = currentBestWi->getOppositeWallLocation(currentWall) == first ? second:first;
+        currentWall = currentBestWi->getOppositeWall(currentWall);
 
-        if (startingWall.p1 == currentWall.p1 && startingWall.p2 == currentWall.p2) break;
+        if (startingWall.compare(currentWall)) break;
         if (maxIterations <= 0) break;
       };
-
+      std::cout << " finished\n";
 
 
 

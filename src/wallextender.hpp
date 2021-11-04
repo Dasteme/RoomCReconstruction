@@ -145,16 +145,47 @@ namespace RoomCReconstruction {
 
     };
 
+    enum intersectionLocation {middle, first, second};    // middle: on the line, fist: closer to first point
+
+    class WalledgeIntersection;
+
+    class Intersection {
+    public:
+      Eigen::Vector2d intersectionPoint;
+
+    };
 
     class Walledge {
     public:
       Eigen::Vector2d p1;
       Eigen::Vector2d p2;
 
+      std::vector<WalledgeIntersection> p1dirIntersections;
+      std::vector<WalledgeIntersection> middleIntersections;
+      std::vector<WalledgeIntersection> p2dirIntersections;
+
+
       Walledge(Eigen::Vector2d p1_p, Eigen::Vector2d p2_p) : p1(p1_p),p2(p2_p) {
 
       };
 
+
+      void addIntersectionInfo(WalledgeIntersection& wi, intersectionLocation location) {
+        if (location == first) { p1dirIntersections.push_back(wi); }
+        else if (location == middle) { middleIntersections.push_back(wi); }
+        else { p2dirIntersections.push_back(wi); }
+      }
+
+      std::vector<WalledgeIntersection> getDirectionalIntersections(intersectionLocation location) {
+        if (location == first) { return p1dirIntersections; }
+        else if (location == middle) { return middleIntersections; }
+        else { return p2dirIntersections; }
+      }
+
+      // Returns true if the walls are the same
+      bool compare(Walledge toWall) {
+        return p1 == toWall.p1 && p2 == toWall.p2;
+      }
     };
 
 
@@ -171,7 +202,6 @@ namespace RoomCReconstruction {
 
 
       // Further information used for combining walls
-      enum intersectionLocation {middle, first, second};    // middle: on the line, fist: closer to first point
       intersectionLocation wall1loc;
       intersectionLocation wall2loc;
       size_t distWall1;
@@ -179,7 +209,9 @@ namespace RoomCReconstruction {
 
 
       WalledgeIntersection(Walledge e1_p, Walledge e2_p) : wall1(e1_p), wall2(e2_p) {
-        intersect2dLines(wall1, wall2, intersectionPoint);
+        // Calculate intersection
+        // 1. Break condition: Lines do not intersect. Return and keep hasIntersection==false;
+        if (!intersect2dLines(wall1, wall2, intersectionPoint)) { return; }
 
         double dist_w1p1 = (wall1.p1 - intersectionPoint).norm();
         double dist_w1p2 = (wall1.p2 - intersectionPoint).norm();
@@ -189,27 +221,28 @@ namespace RoomCReconstruction {
         double dist_w1 = std::min(dist_w1p1, dist_w1p2);
         double dist_w2 = std::min(dist_w2p1, dist_w2p2);
 
-        if (dist_w1 < 100 && dist_w2 < 100) {
-          hasIntersection = true;
+        // 2. Break condition: We can specify a maximum interpolation distance to improve speed and accurracy.
+        if (!(dist_w1 < 100 && dist_w2 < 100)) { return; }
 
-          double len_w1 = (wall1.p2 - wall1.p1).norm();
-          double len_w2 = (wall2.p2 - wall2.p1).norm();
+        // From now on, intersection is ok and calculate some attributes.
+        hasIntersection = true;
 
-          // Point lies on the wall iff the distance from intersection->p1 and intersection->p2
-          // are smaller than the length of the wall.
-          wall1loc = (dist_w1p1 <= len_w1 && dist_w1p2 <= len_w1) ? middle:((dist_w1p1 < dist_w1p2) ? first:second);
-          wall2loc = (dist_w2p1 <= len_w2 && dist_w2p2 <= len_w2) ? middle:((dist_w2p1 < dist_w2p2) ? first:second);
+        double len_w1 = (wall1.p2 - wall1.p1).norm();
+        double len_w2 = (wall2.p2 - wall2.p1).norm();
 
-          // If intersectionpoint lies on wall1, it also must lie on wall2
-          assert((wall1loc == middle && wall2loc == middle) || (wall1loc != middle && wall2loc != middle));
+        // Point lies on the wall iff the distance from intersection->p1 and intersection->p2
+        // are smaller than the length of the wall.
+        wall1loc = (dist_w1p1 <= len_w1 && dist_w1p2 <= len_w1) ? middle:((dist_w1p1 < dist_w1p2) ? first:second);
+        wall2loc = (dist_w2p1 <= len_w2 && dist_w2p2 <= len_w2) ? middle:((dist_w2p1 < dist_w2p2) ? first:second);
 
-          distWall1 = (wall1loc == middle) ? 0:(wall1loc == first) ? dist_w1p1:dist_w1p2;
-          distWall2 = (wall2loc == middle) ? 0:(wall2loc == first) ? dist_w2p1:dist_w2p2;
-        }
+        // If intersectionpoint lies on wall1, it also must lie on wall2
+        assert((wall1loc == middle && wall2loc == middle) || (wall1loc != middle && wall2loc != middle));
+
+
+        distWall1 = (wall1loc == middle) ? 0:(wall1loc == first) ? dist_w1p1:dist_w1p2;
+        distWall2 = (wall2loc == middle) ? 0:(wall2loc == first) ? dist_w2p1:dist_w2p2;
 
         //std::cout << "Intersction at: " << intersectionPoint << "\n";
-
-
       }
 
       friend std::ostream& operator<<(std::ostream& os, WalledgeIntersection const & wei) {
@@ -246,6 +279,36 @@ namespace RoomCReconstruction {
         }
       }
 
+      double interpolatedDistance() {
+        return distWall1 + distWall2;
+      }
+
+      /*
+       * Checks whether this intersection intersects walledge.
+       * The walledge
+       */
+      bool containsWall(Walledge wall) {
+        return wall1.compare(wall) || wall2.compare(wall);
+      }
+
+
+      intersectionLocation getWallLocation(Walledge wall) {
+        if (wall1.compare(wall)) return wall1loc;
+        if (wall2.compare(wall)) return wall2loc;
+        throw std::invalid_argument("received wrong wall");
+      }
+
+      Walledge getOppositeWall(Walledge wall) {
+        if (wall1.compare(wall)) return wall2;
+        if (wall2.compare(wall)) return wall1;
+        throw std::invalid_argument("received wrong wall");
+      }
+
+      intersectionLocation getOppositeWallLocation(Walledge wall) {
+        if (wall1.compare(wall)) return wall2loc;
+        if (wall2.compare(wall)) return wall1loc;
+        throw std::invalid_argument("received wrong wall");
+      }
 
     };
 
