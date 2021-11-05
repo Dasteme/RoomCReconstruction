@@ -4,7 +4,7 @@
 
 #pragma once
 
-
+#include "tinyply/tinyply.hpp"
 #include "ts/pc/pc_tools.hpp"
 #include <iostream>
 
@@ -14,9 +14,8 @@ namespace RoomCReconstruction {
   struct face_indices { std::uint32_t i0, i1, i2; };
   struct edge_indices { std::uint32_t i0, i1; };
 
-  void createPlanarRoom(const std::string& filename, const std::vector <std::vector <Eigen::Vector3d>> intersectionsPoints);
-  void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> intersectionsPoints);
 
-  std::array<face_indices, 2> getFaces(std::vector <Eigen::Vector3d> points);
-  std::vector<face_indices> getFacesConvexPolygon(std::vector <Eigen::Vector3d> points);
+  void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> intersectionsPoints);
+  void standardWrite(const std::string& filename, tinyply::PlyFile& file);
+
 }
