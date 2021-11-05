@@ -15,10 +15,23 @@
 
 namespace RoomCReconstruction {
 
+  // Writes 3D points without colors
+  void writePoints(const std::string& filename, const std::vector <Eigen::Vector3d> points) {
 
+    std::vector<vertex> vertices;
+
+    for (int i = 0; i < points.size(); i++) {
+      vertices.emplace_back(points[i].x(), points[i].y(), points[i].z());
+    }
+
+    tinyply::PlyFile file;
+    fileAddVertices(file, vertices);
+
+    standardWrite(filename, file);
+  }
 
   // Every 2 point form an edge
-  void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> intersectionsPoints) {
+  void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points) {
 
     std::vector<vertex> edge_vertices;
     std::vector<edge_indices> edge_indices;
@@ -26,11 +39,9 @@ namespace RoomCReconstruction {
 
     std::uint32_t current_ind_offset = 0;
 
-    for (int i = 0; i < intersectionsPoints.size(); i++) {
+    for (int i = 0; i < points.size(); i++) {
 
-      edge_vertices.emplace_back(intersectionsPoints[i].x(),
-                                 intersectionsPoints[i].y(),
-                                 intersectionsPoints[i].z());
+      edge_vertices.emplace_back(points[i].x(), points[i].y(), points[i].z());
 
       if (i%2 == 1) {
         edge_indices.emplace_back(current_ind_offset,
@@ -40,51 +51,12 @@ namespace RoomCReconstruction {
 
     }
 
-
-
     tinyply::PlyFile file;
-    file.add_properties_to_element(
-      "vertex",
-      {"x", "y", "z"},
-      tinyply::Type::FLOAT64,
-      edge_vertices.size(),
-      reinterpret_cast<std::uint8_t*>(edge_vertices.data()),
-      tinyply::Type::INVALID,
-      0);
-
-    file.add_properties_to_element(
-      "edge",
-      {"vertex1", "vertex2"},
-      tinyply::Type::INT32,
-      edge_indices.size(),
-      reinterpret_cast<std::uint8_t*>(edge_indices.data()),
-      tinyply::Type::INVALID,
-      0);
-
-/*
-    std::vector <std::array<unsigned char, 3>> colors1(
-      edge_vertices.size(), std::array < unsigned char, 3 > {0});
-    colors1[0] = {255, 0, 0};
-    colors1[1] = {255, 0, 0};
-    colors1[2] = {0, 0, 255};
-    colors1[3] = {0, 0, 255};
-
-
-    file.add_properties_to_element(
-      "vertex",
-      {"red", "green", "blue"},
-      tinyply::Type::UINT8,
-      colors1.size(),
-      const_cast<unsigned char*>(colors1.front().data()),
-      tinyply::Type::INVALID,
-      0);*/
-
-
-
+    fileAddVertices(file, edge_vertices);
+    fileAddEdges(file, edge_indices);
 
     standardWrite(filename, file);
   }
-
 
   void standardWrite(const std::string& filename, tinyply::PlyFile& file) {
     std::filebuf fb_binary;
@@ -101,5 +73,25 @@ namespace RoomCReconstruction {
 
 
 
+  void fileAddVertices(tinyply::PlyFile& file, std::vector<vertex>& vertices) {
+    file.add_properties_to_element(
+      "vertex",
+      {"x", "y", "z"},
+      tinyply::Type::FLOAT64,
+      vertices.size(),
+      reinterpret_cast<std::uint8_t*>(vertices.data()),
+      tinyply::Type::INVALID,
+      0);
+  }
+  void fileAddEdges(tinyply::PlyFile& file, std::vector<edge_indices>& edges) {
+    file.add_properties_to_element(
+      "edge",
+      {"vertex1", "vertex2"},
+      tinyply::Type::INT32,
+      edges.size(),
+      reinterpret_cast<std::uint8_t*>(edges.data()),
+      tinyply::Type::INVALID,
+      0);
+  }
 
 }

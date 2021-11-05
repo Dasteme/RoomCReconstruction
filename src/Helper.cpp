@@ -16,18 +16,6 @@
 namespace RoomCReconstruction {
 
 
-  void write2Dpoints(const std::string& filename, std::vector<Eigen::Vector2d>& points) {
-
-    Eigen::Matrix<double, 3, Eigen::Dynamic> outputMatrix(3, points.size());
-
-    for (int i = 0; i < points.size(); i++) {
-      outputMatrix.col(i) = Eigen::Vector3d{points[i].x(), points[i].y(), 0};
-    }
-    std::vector <std::array<unsigned char, 3>> colors(points.size(), std::array < unsigned char, 3 > {0});
-
-    TangentSpace::IO::write3DPointsWithColors(filename, outputMatrix, colors);
-
-  }
   std::vector<Eigen::Vector3d> simple2Dto3D(std::vector<Eigen::Vector2d>& points2d) {
     std::vector<Eigen::Vector3d> points3d;
     for (int i = 0; i < points2d.size(); i++) {

@@ -343,7 +343,7 @@ namespace RoomCReconstruction {
       //takenEdges.push_back(takenIntersectionPoints[takenIntersectionPoints.size()]);
       //takenEdges.push_back(takenIntersectionPoints[0]);
 
-      write2Dpoints("A_AllFloorIntersections.ply", floorIntersectionPoints);
+      writePoints("A_AllFloorIntersections.ply", simple2Dto3D(floorIntersectionPoints));
       writeEdges("A_AllFloorEdges.ply", simple2Dto3D(floorEdgesPoints));
       writeEdges("A_InterpolatedFloorEdges.ply", simple2Dto3D(takenEdges));
 

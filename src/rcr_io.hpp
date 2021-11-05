@@ -5,7 +5,7 @@
 #pragma once
 
 #include "tinyply/tinyply.hpp"
-#include "ts/pc/pc_tools.hpp"
+#include <Eigen/Dense>
 #include <iostream>
 
 namespace RoomCReconstruction {
@@ -14,8 +14,10 @@ namespace RoomCReconstruction {
   struct face_indices { std::uint32_t i0, i1, i2; };
   struct edge_indices { std::uint32_t i0, i1; };
 
-
-  void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> intersectionsPoints);
+  void writePoints(const std::string& filename, const std::vector <Eigen::Vector3d> points);
+  void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points);
   void standardWrite(const std::string& filename, tinyply::PlyFile& file);
+  void fileAddVertices(tinyply::PlyFile& file, std::vector<vertex>& vertices);
+  void fileAddEdges(tinyply::PlyFile& file, std::vector<edge_indices>& edges);
 
 }
