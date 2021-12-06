@@ -16,5 +16,19 @@ namespace RoomCReconstruction {
   double calcDistance(Eigen::Vector3d vec1, Eigen::Vector3d vec2);
   Eigen::Vector3d calcPerpendicular(const Eigen::Vector3d& vec);
   void printMyVec(const Eigen::Vector3d& vec);
+  void printMyVec2d(const Eigen::Vector2d& vec);
+
+  bool polygon2dToRoom(std::vector<Eigen::Vector2d>& polygon, double floorlvl, double ceilinglvl, std::vector<Eigen::Vector3d>& out_vertices, std::vector<std::uint32_t>& out_faces);
+  bool earClippingPolygon(std::vector<Eigen::Vector2d>& polygon, std::vector<std::uint32_t>& face_indices);
+  double cross2d(Eigen::Vector2d a, Eigen::Vector2d b);
+
+  void Barycentric(Eigen::Vector2d a, Eigen::Vector2d b, Eigen::Vector2d c, Eigen::Vector2d p, double &u, double &v, double &w);
+
+  double randomBetween(double minInclusive, double maxInclusive);
+  bool trueWithProbability(double probability);
+
+
+
+  int getCircularIndex(int arraySize, int index);
 }
 

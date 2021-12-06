@@ -16,6 +16,9 @@ namespace RoomCReconstruction {
 
     constexpr std::size_t CLUSTER_CONTOUR_K_SAMPLES = 120;
 
+    constexpr double minwalldistance = 0.1; // 10cm
+
+
     class ClusterContour {
     public:
         std::vector <size_t> contourPoints;
@@ -56,11 +59,11 @@ namespace RoomCReconstruction {
         }
 
 
-        bool checkAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal) {
+        bool checkAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, double dist, double angle_frac) {
           double distance = (point - center).dot(normal);
-          double gaussian_distance = gaussian_1d(distance, 1.0, 0.0, 5);
+          double gaussian_distance = gaussian_1d(distance, 1.0, 0.0, dist);
           double angle = safe_acos(normal.dot(pointNormal) / (normal.norm() * pointNormal.norm()));
-          double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 32);
+          double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / angle_frac);
 
           /*if (distance2 < 6 && distance2 > 3) {
               std::cout << "Distance: " << distance2 << " becomes: " << gaussian_distance << "\n";
@@ -78,8 +81,12 @@ namespace RoomCReconstruction {
         }
 
         bool checkAndAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex) {
-          if (checkAdd(point, pointNormal)) {
+          if (checkAdd(point, pointNormal, 0.1, 16)) {
             Add(point, pointNormal, pointIndex);
+            return true;
+          }
+          if (checkAdd(point, -pointNormal, 0.1, 16)) {
+            Add(point, -pointNormal, pointIndex);
             return true;
           }
           return false;
@@ -133,9 +140,18 @@ namespace RoomCReconstruction {
 
 
         void tryMergeCluster(Cluster& toMergeCluster) {
-          if(checkAdd(toMergeCluster.center, toMergeCluster.normal)) {
+          if(checkAdd(toMergeCluster.center, toMergeCluster.normal, 0.1, 24)) {
             for (int i = 0; i < toMergeCluster.points.size(); i++) {
               Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
+
+            }
+            toMergeCluster.mergedCluster = true;
+          }
+
+          // Negative normals
+          if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, 0.1, 24)) {
+            for (int i = 0; i < toMergeCluster.points.size(); i++) {
+              Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
 
             }
             toMergeCluster.mergedCluster = true;

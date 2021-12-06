@@ -75,15 +75,15 @@ int main(int argc, const char* argv[]) {
     double numberOfPoints = areaBig / areaSmall;
     std::cout << "MaxRadius " << requiredPCARadius;
     std::cout << "Required Points: " << numberOfPoints;
-    Eigen::VectorXd maxRadiusVector(avg_spacing_per_point.size());
+    /*Eigen::VectorXd maxRadiusVector(avg_spacing_per_point.size());
     for (int i = 0; i < avg_spacing_per_point.size(); i++) {
       maxRadiusVector[i] = areaBig;
-    }
+    }*/
 
 
     // Compute PCA
     time_measure = std::chrono::high_resolution_clock::now();
-    constexpr std::size_t PCA_K = 1000;
+    constexpr std::size_t PCA_K = 300;
     const auto local_pcas = TangentSpace::computeLocalPCAAllPoints(
             search_tree,
             PCA_K,

@@ -19,6 +19,9 @@ namespace RoomCReconstruction {
     const std::array<unsigned char, 3> colorGreen = {0, 255, 0};
     const std::array<unsigned char, 3> colorBlue = {0, 0, 255};
 
+    constexpr double wall_top_dist = 1.0;
+    constexpr double wall_bot_dist = 2.0;
+
 
     void extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
                          const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing) {
@@ -74,7 +77,7 @@ namespace RoomCReconstruction {
 
         // Remove small clusters
         for (auto it = clusters.begin(); it != clusters.end(); it++) {
-          if ((*it).points.size() < 500) {
+          if ((*it).points.size() < 1000) {
             clusters.erase(it--);
           }
         }
@@ -82,7 +85,7 @@ namespace RoomCReconstruction {
 
         // Merge similar clusters
 
-        /*for (int i = 0; i < clusters.size(); i++) {
+        for (int i = 0; i < clusters.size(); i++) {
           for (int j = i+1; j < clusters.size(); j++) {
             Cluster& biggerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[i]:clusters[j];
             Cluster& smallerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[j]:clusters[i];
@@ -94,7 +97,7 @@ namespace RoomCReconstruction {
           if ((*it).mergedCluster) {
             clusters.erase(it--);
           }
-        }*/
+        }
 
 
         //
@@ -128,7 +131,7 @@ namespace RoomCReconstruction {
       // * * * * * * * * * * * *
 
       double floorLevel = std::numeric_limits<double>::max();
-      double ceilingLevel = std::numeric_limits<double>::min();
+      double ceilingLevel = std::numeric_limits<double>::lowest();
       int idxFloorCluster = -1;
       int idxCeilingCluster = -1;
 
@@ -139,8 +142,8 @@ namespace RoomCReconstruction {
 
         Eigen::Vector3d floorNormalAssumption{0, 0, 1};
         double angle = safe_acos(clusters[i].normal.dot(floorNormalAssumption) / (clusters[i].normal.norm() * floorNormalAssumption.norm()));
-        double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 12);
-        if (gaussian_angle > 0.1) {
+        double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 8);
+        if (gaussian_angle > 0.5) {
           if (clusters[i].center[2] < floorLevel) {
             idxFloorCluster = i;
             floorLevel = clusters[i].center[2];
@@ -155,12 +158,23 @@ namespace RoomCReconstruction {
       std::vector<Walledge> floorEdges;
 
 
+      /*if (idxFloorCluster != -1) {
+        for (int k = 0; k < clusters[idxFloorCluster].points.size(); k++) {
+          colors[clusters[idxFloorCluster].points[k]] = colorRed;
+        }
+      }
+      if (idxCeilingCluster != -1) {
+        for (int k = 0; k < clusters[idxCeilingCluster].points.size(); k++) {
+          colors[clusters[idxCeilingCluster].points[k]] = colorBlue;
+        }
+      }*/
+
       int debugCounter = 10;
 
       //Search wall clusters
       std::vector<int> wallClusters;
       for (int i = 0; i < clusters.size(); i++) {
-        if ((abs(clusters[i].normal[2]) < 0.01) && checkWallBotTop(clusters[i].pointsReal, floorLevel, ceilingLevel)) {
+        if ((abs(clusters[i].normal[2]) < 0.05) && checkWallBotTop(clusters[i].pointsReal, floorLevel, ceilingLevel)) {
 
 
           wallClusters.push_back(i);
@@ -273,6 +287,8 @@ namespace RoomCReconstruction {
 
 
       std::cout << "Preparing combination - ";
+      if (floorEdges.size() > 2) {
+
       // Start with the biggest wall
       Walledge currentWall = floorEdges[0];
       for (Walledge we : floorEdges) {
@@ -316,7 +332,7 @@ namespace RoomCReconstruction {
         if (startingWall.compare(currentWall)) break;
         if (maxIterations <= 0) break;
       };
-      std::cout << " finished\n";
+
 
 
 
@@ -347,17 +363,19 @@ namespace RoomCReconstruction {
       writeEdges("A_AllFloorEdges.ply", simple2Dto3D(floorEdgesPoints));
       writeEdges("A_InterpolatedFloorEdges.ply", simple2Dto3D(takenEdges));
 
-      std::cout << "ClusterIndex: " << idxFloorCluster;
-      /*if (idxFloorCluster != -1) {
-        for (int k = 0; k < clusters[idxFloorCluster].points.size(); k++) {
-          colors[clusters[idxFloorCluster].points[k]] = colorRed;
-        }
+
+      std::vector<Eigen::Vector3d> vertices;
+      std::vector<std::uint32_t> faces;
+      polygon2dToRoom(takenIntersectionPoints, floorLevel, ceilingLevel, vertices, faces);
+      writePointsWithFaces("A_Room.ply", vertices, faces);
+
       }
-      if (idxCeilingCluster != -1) {
-        for (int k = 0; k < clusters[idxCeilingCluster].points.size(); k++) {
-          colors[clusters[idxCeilingCluster].points[k]] = colorBlue;
-        }
-      }*/
+      std::cout << " finished\n";
+
+
+
+      std::cout << "ClusterIndex: " << idxFloorCluster;
+
 
 
 
@@ -508,7 +526,7 @@ namespace RoomCReconstruction {
         if (p[2] < max_bot) max_bot = p[2];
       }
 
-      return abs(ceilingLevel - max_top) < 60 && abs(floorLevel - max_bot) < 170;
+      return abs(ceilingLevel - max_top) < wall_top_dist && abs(floorLevel - max_bot) < wall_bot_dist;
     }
 
 
