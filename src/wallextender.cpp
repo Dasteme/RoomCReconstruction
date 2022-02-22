@@ -19,7 +19,7 @@ namespace RoomCReconstruction {
     const std::array<unsigned char, 3> colorGreen = {0, 255, 0};
     const std::array<unsigned char, 3> colorBlue = {0, 0, 255};
 
-    constexpr double wall_top_dist = 1.0;
+    constexpr double wall_top_dist = 0.75;
     constexpr double wall_bot_dist = 2.0;
 
 
@@ -45,11 +45,11 @@ namespace RoomCReconstruction {
             const double lambda_2{local_pcas[i].eigenvalues.y() / ev_sum};
 
 
-            const double planarPointScore{gaussian_2d(
-                    lambda_1, lambda_2, 1.0, 0.5, 0.5, 0.2, 0.2)};
+            const double stringPointScore = 1 - (local_pcas[i].eigenvalues.y() / local_pcas[i].eigenvalues.x());
+            const double planarPointScore = 1 - (local_pcas[i].eigenvalues.z() / local_pcas[i].eigenvalues.y());
 
             // Go to next point if Score is too low
-            if (planarPointScore < 0.995) continue;
+            if (planarPointScore < 0.99 || stringPointScore > 0.3) continue;
 
             bool found = false;
             for (int j = 0; j != clusters.size(); j++) {
@@ -85,7 +85,7 @@ namespace RoomCReconstruction {
 
         // Merge similar clusters
 
-        for (int i = 0; i < clusters.size(); i++) {
+        /*for (int i = 0; i < clusters.size(); i++) {
           for (int j = i+1; j < clusters.size(); j++) {
             Cluster& biggerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[i]:clusters[j];
             Cluster& smallerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[j]:clusters[i];
@@ -97,7 +97,7 @@ namespace RoomCReconstruction {
           if ((*it).mergedCluster) {
             clusters.erase(it--);
           }
-        }
+        }*/
 
 
         //

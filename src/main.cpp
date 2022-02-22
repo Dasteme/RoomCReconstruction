@@ -10,6 +10,9 @@
 
 int main(int argc, const char* argv[]) {
 
+    std::srand(time(0));
+    std::srand(std::rand());          // Double seeding to overcome the fact that the first digits of time(0) are quite constant.
+
     // Check for pointcloud-parameter
     if (argc < 2) {std::cerr << "Please specify the path for the pointcloud\n"; return 1;}
     if (argc > 2) {std::cerr << "Too many arguments\n"; return 1;}
