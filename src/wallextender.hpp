@@ -52,6 +52,8 @@ namespace RoomCReconstruction {
 
         std::vector <Eigen::Vector3d> intersectionsPoints;
 
+        std::vector<std::array<int, 3>> supportiveCubes;
+
         Cluster() {
             color[0] = rand() % 256;
             color[1] = rand() % 256;
@@ -67,6 +69,12 @@ namespace RoomCReconstruction {
 
           return (gaussian_distance > 0.6 && gaussian_angle > 0.6);
         }
+        bool checkAddNoNormal(Eigen::Vector3d point, double dist) {
+          double distance = (point - center).dot(normal);
+          double gaussian_distance = gaussian_1d(distance, 1.0, 0.0, dist);
+
+          return (gaussian_distance > 0.6);
+        }
 
         void Add(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex) {
           points.push_back(pointIndex);
@@ -75,6 +83,10 @@ namespace RoomCReconstruction {
           updateCenter(point);
           updateNormal(pointNormal);
         }
+      void AddNoNormal(Eigen::Vector3d point, size_t pointIndex) {
+        points.push_back(pointIndex);
+        pointsReal.push_back(point);
+      }
 
         bool checkAndAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex) {
           if (checkAdd(point, pointNormal, 0.05, 32)) {
@@ -135,17 +147,17 @@ namespace RoomCReconstruction {
         }
 
 
-        void tryMergeCluster(Cluster& toMergeCluster) {
-          if(checkAdd(toMergeCluster.center, toMergeCluster.normal, 0.1, 24)) {
+        void tryMergeCluster(Cluster& toMergeCluster, double dist, double angle_frac) {
+
+          if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac)) {
             for (int i = 0; i < toMergeCluster.points.size(); i++) {
               Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
-
             }
             toMergeCluster.mergedCluster = true;
           }
 
           // Negative normals
-          if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, 0.1, 24)) {
+          if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, dist, angle_frac)) {
             for (int i = 0; i < toMergeCluster.points.size(); i++) {
               Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
 
@@ -154,10 +166,116 @@ namespace RoomCReconstruction {
           }
         }
 
+      void tryAbsorbCluster(Cluster& toAbsorbCluster, double dist, double absorbPercent) {
+
+        int possibleAbsorbsions = 0;
+        for (int i = 0; i < toAbsorbCluster.points.size(); i++) {
+          if(checkAddNoNormal(toAbsorbCluster.pointsReal[i], dist)) {
+            possibleAbsorbsions++;
+          }
+        }
+        if (possibleAbsorbsions / toAbsorbCluster.points.size() >= absorbPercent) {
+          for (int i = 0; i < toAbsorbCluster.points.size(); i++) {
+            AddNoNormal(toAbsorbCluster.pointsReal[i], toAbsorbCluster.points[i]); // Note: Normal is likely to be off. Just add for supportive
+          }
+          toAbsorbCluster.mergedCluster = true;
+        }
+      }
+
+      void addSupportiveRoomCube(int x, int y, int z) {
+        // Check if we already have this supportive cube
+        for (int i = 0; i < supportiveCubes.size(); i++) {
+          if (supportiveCubes[i][0] == x && supportiveCubes[i][1] == y && supportiveCubes[i][2] == 2) {
+            return;
+          }
+        }
+
+        // We don't have it, so add it
+        supportiveCubes.push_back({x,y,z});
+      }
+
 
     };
 
     enum intersectionLocation {middle, first, second};    // middle: on the line, fist: closer to first point
+
+
+class IntersectionTriangle {
+public:
+
+  int idxC1;
+  int idxC2;
+  int idxC3;
+
+  Eigen::Vector3d corner;
+  Eigen::Vector3d arrow1;
+  Eigen::Vector3d arrow2;
+  Eigen::Vector3d arrow3;
+
+
+  IntersectionTriangle(int idxC1_p,
+                       int idxC2_p,
+                       int idxC3_p,
+                       Eigen::Vector3d corner_p,
+                       Eigen::Vector3d arrow1_p,
+                       Eigen::Vector3d arrow2_p,
+                       Eigen::Vector3d arrow3_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(corner_p),arrow1(arrow1_p),arrow2(arrow2_p),arrow3(arrow3_p)
+  {}
+
+};
+
+
+
+
+class RoomCube {
+public:
+
+  double posX;
+  double posY;
+  double posZ;
+  double width;
+
+  RoomCube *right;
+  RoomCube *left;
+  RoomCube *front;
+  RoomCube *back;
+  RoomCube *up;
+  RoomCube *down;
+
+  std::vector <size_t> points;
+
+  RoomCube() {}
+
+  void init(double posX_p, double posY_p, double posZ_p, double width_p) {
+    posX = posX_p;
+    posY = posY_p;
+    posZ = posZ_p;
+    width = width_p;
+  }
+
+  void addPoint(size_t index) {
+    points.push_back(index);
+  }
+
+  void toMesh(std::vector<Eigen::Vector3d>& vertices, std::vector<std::uint32_t>& faces) {
+    std::vector<Eigen::Vector2d> polygon;
+    polygon.push_back(Eigen::Vector2d(posX-width/2, posY-width/2));
+    polygon.push_back(Eigen::Vector2d(posX-width/2, posY+width/2));
+    polygon.push_back(Eigen::Vector2d(posX+width/2, posY+width/2));
+    polygon.push_back(Eigen::Vector2d(posX+width/2, posY-width/2));
+    polygon2dToRoom(polygon, posZ-width/2, posZ+width/2, vertices, faces);
+  }
+
+};
+
+
+
+
+
+
+
+
+
 
     class WalledgeIntersection;
 
@@ -368,10 +486,25 @@ namespace RoomCReconstruction {
     };
 
     bool intersect3Clusters(Cluster cluster1, Cluster cluster2, Cluster cluster3, Eigen::Vector3d& resultPoint);
-
+    bool intersect2Clusters(Cluster c1, Cluster c2, Eigen::Vector3d& direction);
 
    Walledge calculateWallBoundaries(const Eigen::Vector2d& linevec, const std::vector<Eigen::Vector3d>& points);
    bool checkWallBotTop(const std::vector<Eigen::Vector3d>& points, double floorLevel, double ceilingLevel);
+bool checkSomewhatOrthogonal(Cluster c1, Cluster c2);
+
+void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::Vector3d arrow, std::array<int, 2> res);
+Eigen::Vector3d rotateAround(Eigen::Vector3d toRotate, Eigen::Vector3d aroundRotate);
+std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Cluster c, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2);
+
+
+struct ExtStr {
+  int intersectionIdx;
+  double dist;
+  int myArrow;
+  int opposingArrow;
+};
+std::vector<ExtStr> findPossibleExtensions(const std::vector<IntersectionTriangle>& iT, const std::vector<int>& excluded, const int& from);
+bool recursiveBestCircle(const std::vector<IntersectionTriangle>& iT, const std::vector<int>& exc,std::vector<int>& circle,const int& searchingDir);
 
     void
     extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,

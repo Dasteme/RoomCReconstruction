@@ -80,7 +80,12 @@ namespace RoomCReconstruction {
   }
 
 
-
+  void appendVerticesFaces(std::vector<Eigen::Vector3d>& v1, std::vector<std::uint32_t>& f1, std::vector<Eigen::Vector3d>& v2, std::vector<std::uint32_t>& f2) {
+    for (auto f : f2) {
+      f1.push_back(f + v1.size());
+    }
+    v1.insert(v1.end(), v2.begin(), v2.end());
+  }
 
   bool polygon2dToRoom(std::vector<Eigen::Vector2d>& polygon, double floorlvl, double ceilinglvl, std::vector<Eigen::Vector3d>& out_vertices, std::vector<std::uint32_t>& out_faces) {
 
@@ -145,7 +150,7 @@ namespace RoomCReconstruction {
         std::uint32_t b = indexList[getCircularIndex(indexList.size(), i-1)];
         std::uint32_t c = indexList[getCircularIndex(indexList.size(), i+1)];
 
-        std::cout << a << ", " << b << ", " << c;
+        //std::cout << a << ", " << b << ", " << c;
 
         Eigen::Vector2d va = polygon[a];
         Eigen::Vector2d vb = polygon[b];

@@ -30,6 +30,24 @@ namespace RoomCReconstruction {
     standardWrite(filename, file);
   }
 
+  // Writes 3D points with colors
+  void writePointsWColors(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::array<unsigned char, 3>>& colors) {
+
+    std::vector<vertex> vertices;
+
+    for (int i = 0; i < points.size(); i++) {
+      vertices.emplace_back(points[i].x(), points[i].y(), points[i].z());
+    }
+
+    tinyply::PlyFile file;
+    fileAddVertices(file, vertices);
+    fileAddColors(file, colors);
+
+    standardWrite(filename, file);
+  }
+
+
+
   // Every 2 point form an edge
   void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points) {
 
@@ -125,6 +143,16 @@ namespace RoomCReconstruction {
       reinterpret_cast<std::uint8_t*>(faces.data()),
       tinyply::Type::UINT8,
       3);
+  }
+  void fileAddColors(tinyply::PlyFile& file, const std::vector<std::array<unsigned char, 3>>& colors) {
+    file.add_properties_to_element(
+      "vertex",
+      {"red", "green", "blue"},
+      tinyply::Type::UINT8,
+      colors.size(),
+      const_cast<unsigned char*>(colors.front().data()),
+      tinyply::Type::INVALID,
+      0);
   }
 
 }

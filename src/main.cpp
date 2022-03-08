@@ -47,7 +47,7 @@ int main(int argc, const char* argv[]) {
 
     // Compute average spacing
     time_measure = std::chrono::high_resolution_clock::now();
-    constexpr std::size_t K_AVG_SPACING = 100;
+    constexpr std::size_t K_AVG_SPACING = 160;
     const auto avg_spacing_per_point = TangentSpace::computeAverageSpacingAllPoints(search_tree, K_AVG_SPACING);
     const auto avg_spacing = avg_spacing_per_point.sum() / static_cast<double>(avg_spacing_per_point.size());
     const double avg_spacing_sdev{ [&avg_spacing_per_point,
@@ -86,7 +86,7 @@ int main(int argc, const char* argv[]) {
 
     // Compute PCA
     time_measure = std::chrono::high_resolution_clock::now();
-    constexpr std::size_t PCA_K = 300;
+    constexpr std::size_t PCA_K = 160;
     const auto local_pcas = TangentSpace::computeLocalPCAAllPoints(
             search_tree,
             PCA_K,
