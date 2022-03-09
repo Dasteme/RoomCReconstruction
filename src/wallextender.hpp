@@ -9,8 +9,10 @@
 #include <iostream>
 #include <numbers>
 
+#include "TriangleNode3D.hpp"
 #include "Helper.hpp"
 #include "rcr_io.hpp"
+
 
 namespace RoomCReconstruction {
 
@@ -199,30 +201,6 @@ namespace RoomCReconstruction {
 
     enum intersectionLocation {middle, first, second};    // middle: on the line, fist: closer to first point
 
-
-class IntersectionTriangle {
-public:
-
-  int idxC1;
-  int idxC2;
-  int idxC3;
-
-  Eigen::Vector3d corner;
-  Eigen::Vector3d arrow1;
-  Eigen::Vector3d arrow2;
-  Eigen::Vector3d arrow3;
-
-
-  IntersectionTriangle(int idxC1_p,
-                       int idxC2_p,
-                       int idxC3_p,
-                       Eigen::Vector3d corner_p,
-                       Eigen::Vector3d arrow1_p,
-                       Eigen::Vector3d arrow2_p,
-                       Eigen::Vector3d arrow3_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(corner_p),arrow1(arrow1_p),arrow2(arrow2_p),arrow3(arrow3_p)
-  {}
-
-};
 
 
 
@@ -497,14 +475,9 @@ Eigen::Vector3d rotateAround(Eigen::Vector3d toRotate, Eigen::Vector3d aroundRot
 std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Cluster c, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2);
 
 
-struct ExtStr {
-  int intersectionIdx;
-  double dist;
-  int myArrow;
-  int opposingArrow;
-};
-std::vector<ExtStr> findPossibleExtensions(const std::vector<IntersectionTriangle>& iT, const std::vector<int>& excluded, const int& from);
-bool recursiveBestCircle(const std::vector<IntersectionTriangle>& iT, const std::vector<int>& exc,std::vector<int>& circle,const int& searchingDir);
+
+
+bool recursiveBestCircle(const std::vector<TriangleNode3D>& iT, const std::vector<int>& exc,std::vector<int>& circle,const int& searchingDir);
 
     void
     extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,

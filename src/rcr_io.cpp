@@ -47,6 +47,35 @@ namespace RoomCReconstruction {
   }
 
 
+  // Todo: Improve methods to avoid dupplicated code
+  void writeEdgesWColors(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::array<unsigned char, 3>>& colors) {
+
+    std::vector<vertex> edge_vertices;
+    std::vector<edge_indices> edge_indices;
+
+
+    std::uint32_t current_ind_offset = 0;
+
+    for (int i = 0; i < points.size(); i++) {
+
+      edge_vertices.emplace_back(points[i].x(), points[i].y(), points[i].z());
+
+      if (i%2 == 1) {
+        edge_indices.emplace_back(current_ind_offset,
+                                  current_ind_offset + 1);
+        current_ind_offset += 2;
+      }
+
+    }
+
+    tinyply::PlyFile file;
+    fileAddVertices(file, edge_vertices);
+    fileAddEdges(file, edge_indices);
+    fileAddColors(file, colors);
+
+    standardWrite(filename, file);
+  }
+
 
   // Every 2 point form an edge
   void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points) {

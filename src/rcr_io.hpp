@@ -16,6 +16,7 @@ namespace RoomCReconstruction {
 
   void writePoints(const std::string& filename, const std::vector <Eigen::Vector3d> points);
   void writePointsWColors(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::array<unsigned char, 3>>& colors);
+  void writeEdgesWColors(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::array<unsigned char, 3>>& colors);
   void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points);
   void writePointsWithFaces(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::uint32_t> faceIndices);
   void standardWrite(const std::string& filename, tinyply::PlyFile& file);

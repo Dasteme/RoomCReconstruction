@@ -356,10 +356,10 @@ namespace RoomCReconstruction {
       std::vector<Eigen::Vector3d> corners;
       std::vector<std::array<unsigned char, 3>> cornerColors;
 
-      std::vector<IntersectionTriangle> intersection_triangles;
+      std::vector<TriangleNode3D> intersection_triangles;
 
       for (int k = 0; k < clusters.size(); k++) {
-        for (int i = 0; i < clusters.size(); i++) {
+        for (int i = k+1; i < clusters.size(); i++) {
           if (!checkSomewhatOrthogonal(clusters[k], clusters[i])) continue;
           for (int j = i + 1; j < clusters.size(); j++) {
             if (!checkSomewhatOrthogonal(clusters[k], clusters[j])) continue;
@@ -819,8 +819,8 @@ namespace RoomCReconstruction {
                    "\n"; std::cout << "suggestionArrow3FromC3: " << suggestionArrow3FromC3 <<
                    "\n";*/
 
-                intersection_triangles.push_back(IntersectionTriangle(
-                  k, i, j, cornerPoint, edgeLine1, edgeLine2, edgeLine3));
+                intersection_triangles.push_back(TriangleNode3D(
+                  k, i, j, cornerPoint, {edgeLine1, edgeLine2, edgeLine3}));
               }
             }
           }
@@ -830,7 +830,7 @@ namespace RoomCReconstruction {
 
       std::vector<int> exc;
 
-      const auto findFirstNotExcl{[](std::vector<IntersectionTriangle> intersection_triangles, std::vector<int> exc) -> int {
+      const auto findFirstNotExcl{[](std::vector<TriangleNode3D> intersection_triangles, std::vector<int> exc) -> int {
         std::cout << "Exclusions: \n";
         for (int iii : exc) {
           std::cout << std::to_string(iii) << ", ";
@@ -869,16 +869,64 @@ namespace RoomCReconstruction {
 
 
 
-
-
-
-
+      // Applys indices to triangles.
       for (int jj = 0; jj < intersection_triangles.size(); jj++) {
-        std::vector<ExtStr> resArr123456 = findPossibleExtensions(intersection_triangles, exc, jj);
+        intersection_triangles[jj].myIndex = jj;
+      }
+
+      // Sets up links between intersectionsTriangles
+      std::cout << "Setup links between triangles...";
+      for (int jj = 0; jj < intersection_triangles.size(); jj++) {
+        intersection_triangles[jj].findPossibleFollowers(intersection_triangles, jj);
+      }
+      std::cout << "\n";
+
+      std::cout << "Printing triangles:\n";
+      for (int jj = 0; jj < intersection_triangles.size(); jj++) {
+        if (intersection_triangles[jj].isInvalid()) {continue;}
+        intersection_triangles[jj].print(intersection_triangles);
+      }
+      std::cout << "\n";
+
+      std::cout << "Recursive Search trough triangles:";
+      for (int jj = 0; jj < intersection_triangles.size(); jj++) {
+
+        if (intersection_triangles[jj].isInvalid()) {continue;}
+        intersection_triangles[jj].print(intersection_triangles);
+
+        if(intersection_triangles[jj].recursiveGraphTraversal(intersection_triangles, 0)) {
+          std::cout << "found circle!\n";
+
+          std::queue<int> possibleFollowups;
+          std::vector<int> dones;
+          std::vector<ClusterPolygon> polygons;
+
+          possibleFollowups.push(jj);
+          while (!possibleFollowups.empty()) {
+            intersection_triangles[possibleFollowups.front()].toClusterPolygons(intersection_triangles, polygons, possibleFollowups, dones);
+            possibleFollowups.pop();
+          }
+
+
+          for (ClusterPolygon cp : polygons) {
+            std::cout << "Cidx: " << cp.idxCluster << "\n";
+            for (Eigen::Vector3d pnt : cp.points) {
+              std::cout << "[" << pnt[0] << "," << pnt[1] << "," << pnt[2] << "], ";
+            }
+            std::cout << "\n";
+          }
+          break;
+        } else {
+          std::cout << "Didn't found anything :(\n";
+        }
+
+        /*std::vector<ExtStr> resArr123456 = findPossibleExtensions(intersection_triangles, exc, jj);
         for (ExtStr e1234 : resArr123456) {
           std::cout << "resArr_" << std::to_string(jj) << ": " << e1234.intersectionIdx << ", " << e1234.dist << "," << e1234.myArrow << ", " << e1234.opposingArrow << "\n";
-        }
+        }*/
       }
+
+
 
 
 
@@ -904,16 +952,47 @@ namespace RoomCReconstruction {
 
       // Debug arrows
       std::vector<Eigen::Vector3d> arrows;
-      for (IntersectionTriangle t : intersection_triangles) {
-        arrows.push_back(t.corner);
-        arrows.push_back(t.corner+t.arrow1);
-        arrows.push_back(t.corner);
-        arrows.push_back(t.corner+t.arrow2);
-        arrows.push_back(t.corner);
-        arrows.push_back(t.corner+t.arrow3);
-      }
-      writeEdges("output_clustering_6_arrows.ply", arrows);
+      std::vector<std::array<unsigned char, 3>> arrowColors;
 
+      for (int i = 0; i < intersection_triangles.size(); i++) {
+        TriangleNode3D& t = intersection_triangles[i];
+        arrows.push_back(t.corner);
+        arrows.push_back(t.corner+t.arrows[0]);
+        arrows.push_back(t.corner);
+        arrows.push_back(t.corner+t.arrows[1]);
+        arrows.push_back(t.corner);
+        arrows.push_back(t.corner+t.arrows[2]);
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+      }
+      writeEdgesWColors("output_clustering_6_arrows.ply", arrows, arrowColors);
+
+
+      // Debug Arrows 2
+      std::vector<Eigen::Vector3d> arrows2;
+      std::vector<std::array<unsigned char, 3>> arrowColors2;
+
+      for (int i = 0; i < intersection_triangles.size(); i++) {
+        TriangleNode3D& t = intersection_triangles[i];
+        if (t.isInvalid()) continue;
+        arrows2.push_back(t.corner);
+        arrows2.push_back(t.corner+t.arrows[0]);
+        arrows2.push_back(t.corner);
+        arrows2.push_back(t.corner+t.arrows[1]);
+        arrows2.push_back(t.corner);
+        arrows2.push_back(t.corner+t.arrows[2]);
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+      }
+      writeEdgesWColors("output_clustering_7_arrows_linked.ply", arrows2, arrowColors2);
 
       /*std::cout << clusters.size() << " Clusters with shown keyclusters\n";
       std::fill(colors.begin(), colors.end(), std::array < unsigned char, 3 > {0});
@@ -1426,67 +1505,10 @@ namespace RoomCReconstruction {
     }
 
 
-std::vector<ExtStr> findPossibleExtensions(const std::vector<IntersectionTriangle>& iT, const std::vector<int>& excluded, const int& from) {
-  //IntersectionTriangle& fromTri = iT[from];
-  std::vector<ExtStr> resArr;
 
-  for (int i = 0; i < iT.size(); i++) {
-    if (std::find(excluded.begin(), excluded.end(), i) != excluded.end()) continue;
-
-    const IntersectionTriangle& t = iT[i];
-    if (t.idxC1 == iT[from].idxC1) {  // Todo: Assertion. Should always be the case
-
-    // Test if we have 2 same clusters (note: 3 is not possible, otherwise it would be the same itersection)
-      if (t.idxC2 == iT[from].idxC2) {
-        if (t.arrow1 != iT[from].arrow1 && t.arrow1 != -iT[from].arrow1) {
-          std::cout << "ERROR\n";
-          continue;
-        } else {
-          if (t.arrow1 == -iT[from].arrow1) { // Two opposing arrows
-            resArr.push_back({i, (t.corner-iT[from].corner).norm(), 1, 1});
-          }
-        }
-      }
-      if (t.idxC2 == iT[from].idxC3) {
-        if (t.arrow1 != iT[from].arrow2 && t.arrow1 != -iT[from].arrow2) {
-          std::cout << "ERROR\n";
-          continue;
-        } else {
-          if (t.arrow1 == -iT[from].arrow2) { // Two opposing arrows
-            resArr.push_back({i, (t.corner-iT[from].corner).norm(), 2, 1});
-          }
-        }
-      }
-      if (t.idxC3 == iT[from].idxC2) {
-        if (t.arrow2 != iT[from].arrow1 && t.arrow2 != -iT[from].arrow1) {
-          std::cout << "ERROR\n";
-          continue;
-        } else {
-          if (t.arrow2 == -iT[from].arrow1) { // Two opposing arrows
-            resArr.push_back({i, (t.corner-iT[from].corner).norm(), 1, 2});
-          }
-        }
-      }
-      if (t.idxC3 == iT[from].idxC3) {
-        if (t.arrow2 != iT[from].arrow2 && t.arrow2 != -iT[from].arrow2) {
-          std::cout << "ERROR\n";
-          continue;
-        } else {
-          if (t.arrow2 == -iT[from].arrow2) { // Two opposing arrows
-            resArr.push_back({i, (t.corner-iT[from].corner).norm(), 2, 2});
-          }
-        }
-      }
-    } else {
-      std::cout << "ERROR\n";
-      continue;
-    }
-  }
-  return resArr;
-};
 
 // Recursively looks for new circle-members. Always tries to append triangle with smallest distance. Looks in searchDir
-bool recursiveBestCircle(const std::vector<IntersectionTriangle>& iT,
+bool recursiveBestCircle(const std::vector<TriangleNode3D>& iT,
                          const std::vector<int>& exc,
                          std::vector<int>& circle,
                          const int& searchingDir) {

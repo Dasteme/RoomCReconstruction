@@ -18,6 +18,7 @@ set(HEADER_FILES
         external/ts/pc/pc_base.hpp
         external/ts/pc/pc_score.hpp
         src/wallextender.hpp
+        src/TriangleNode3D.hpp
         src/rcr_io.hpp
         src/Helper.hpp
         )
@@ -29,6 +30,7 @@ set(SOURCE_FILES
         external/ts/pc/pc_score.cpp
         src/main.cpp
         src/wallextender.cpp
+        src/TriangleNode3D.cpp
         src/rcr_io.cpp
         src/Helper.cpp
         )
