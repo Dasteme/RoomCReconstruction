@@ -18,7 +18,7 @@ namespace RoomCReconstruction {
   };
   struct ClusterPolygon {
     int idxCluster;
-    std::vector<Eigen::Vector3d> points;
+    std::vector<int> triangles;
   };
 
 class TriangleNode3D;
@@ -64,6 +64,8 @@ struct ExtStr2 {
 
     }
 
+    // Note: might not work in every room-case because
+    //       if a2 or a3 don't work, we should go back and modify a1 (or a2/a1 in case of a3 doesn't work)
 
     bool recursiveGraphTraversal(std::vector<TriangleNode3D>& allTriangles, int depth) {
       if (isInvalid()) return false;
@@ -160,13 +162,29 @@ struct ExtStr2 {
             continue;
           } else {
             if (this->arrows[myArrowIdx] == -t.arrows[followingArrayIdx]) { // Two opposing arrows
-              possibilites[myArrowIdx].push_back({myIdx, i, (t.corner - this->corner).norm(), myArrowIdx, followingArrayIdx});
+              // Check if arrows are opposing like --->   <---, and not <---  ---->
+              // For this, corner to the other corner must be smaller than when added the arrow
+              if ((t.corner - this->corner).norm() < ((t.corner - this->corner)+this->arrows[myArrowIdx]).norm()) {
+                possibilites[myArrowIdx].push_back({myIdx, i, (t.corner - this->corner).norm(), myArrowIdx, followingArrayIdx});
+              }
+
             }
           }
         }
       }
 
 
+    }
+
+
+    void sortPossibilities() {
+      const auto comparePoss{[](ExtStr2 e1, ExtStr2 e2) -> bool {
+        return !(e1.dist > e2.dist);
+      }};
+
+      for (int i = 0; i < 3; i++) {
+        std::sort(possibilites[i].begin(), possibilites[i].end(), comparePoss);
+      }
     }
 
     bool hasTwoSimilarClusters(TriangleNode3D t, int& myArrowI, int& follorwingArrowI) {
@@ -227,9 +245,11 @@ struct ExtStr2 {
 
       for (int idx : {idxC1, idxC2, idxC3}) {
         if (!clusterPolygonsContainCluster(polygons, idx)) {
-          ClusterPolygon newOne{idx, std::vector<Eigen::Vector3d>()};
+          std::cout << "CLGEN: By: " << myIndex << ", ClIdx: " << idx;
+          ClusterPolygon newOne{idx, std::vector<int>()};
           ExtStr2 link = findNextExtStr2Plane(idx, -1);
           iterateOverClusterContour(allTriangles, link, myIndex, idx, newOne, possibleFollowups, dones);
+          printClusterPolygon(newOne);
           polygons.push_back(newOne);
         }
       }
@@ -273,17 +293,23 @@ struct ExtStr2 {
         possibleFollowups.push(myIndex);
       }
       std::cout << "SI:" << startIndex << ", CI: " << clusterIndex << ", MyIdx: " << myIndex << ", Link: " << link.myTriangle << "," << link.opposingTriangle << "\n";
-      cp.points.push_back(allTriangles[link.myTriangle].corner);
+      cp.triangles.push_back(allTriangles[link.myTriangle].myIndex);
+
+      if (link.opposingTriangle == startIndex) return;
       ExtStr2 nextLink = allTriangles[link.opposingTriangle].findNextExtStr2Plane(clusterIndex, myIndex);
       std::cout << "NextLink: " << nextLink.myTriangle << "," << nextLink.opposingTriangle << "\n";
-      if (nextLink.opposingTriangle == startIndex) return;
+
       allTriangles[link.opposingTriangle].iterateOverClusterContour(allTriangles, nextLink, startIndex, clusterIndex, cp, possibleFollowups, dones);
 
     }
 
     bool clusterPolygonsContainCluster(std::vector<ClusterPolygon>& polygons, int clusterIndex) {
       for (ClusterPolygon cp : polygons) {
-        if (cp.idxCluster == clusterIndex) return true;
+        if (cp.idxCluster == clusterIndex) {
+          for (int i : cp.triangles) {
+            if (i == myIndex) return true;
+          }
+        }
       }
       return false;
     }
@@ -294,6 +320,7 @@ struct ExtStr2 {
       std::cout << "c:";
       printVector3D(corner);
       std::cout << ", ";
+      std::cout << "Clusters: " << idxC1 << "," << idxC2 << "," << idxC3 << ", ";
       for (int i = 0; i < 3; i++) {
         std::cout << "poss_" << i << ": [";
         for (int j = 0; j < possibilites[i].size(); j++) {
@@ -314,13 +341,17 @@ struct ExtStr2 {
         << std::to_string(vec[1]) << ","
         << std::to_string(vec[2]);
     }
-    double formatDouble(double d, int digits) {
-      return ((int) d*std::pow(10, digits)) / (double) std::pow(10, digits);
-    }
     void printDepthIndent(int depth) {
       for (int i = 0; i < depth; i++) {
         std::cout << "  ";
       }
+    }
+    void printClusterPolygon(ClusterPolygon cp) {
+      std::cout << "CLPOLY: " << cp.idxCluster;
+      for (int i : cp.triangles) {
+        std::cout << i << ",";
+      }
+      std::cout << "\n";
     }
   };
 

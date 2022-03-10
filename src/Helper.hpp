@@ -21,6 +21,7 @@ namespace RoomCReconstruction {
 
   bool polygon2dToRoom(std::vector<Eigen::Vector2d>& polygon, double floorlvl, double ceilinglvl, std::vector<Eigen::Vector3d>& out_vertices, std::vector<std::uint32_t>& out_faces);
   bool earClippingPolygon(std::vector<Eigen::Vector2d>& polygon, std::vector<std::uint32_t>& face_indices);
+  double computePolygonArea(const std::vector<Eigen::Vector2d>& vertices);
   double cross2d(Eigen::Vector2d a, Eigen::Vector2d b);
 
   void Barycentric(Eigen::Vector2d a, Eigen::Vector2d b, Eigen::Vector2d c, Eigen::Vector2d p, double &u, double &v, double &w);
@@ -31,5 +32,6 @@ namespace RoomCReconstruction {
 
 
   int getCircularIndex(int arraySize, int index);
+double formatDouble(double d, int digits);
 }
 

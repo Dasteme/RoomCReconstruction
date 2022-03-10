@@ -138,6 +138,13 @@ namespace RoomCReconstruction {
 
     if (polygon.size() < 3) { return false; }
 
+    // Reverse if polygon is not in right order
+    bool reversed = false;
+    if (computePolygonArea(polygon) < 0) {
+      //std::reverse(polygon.begin(), polygon.end());
+      reversed = true;
+    }
+
     std::vector<std::uint32_t> indexList;
     for (std::uint32_t i = 0; i < polygon.size(); i++) {
       indexList.push_back(i);
@@ -147,8 +154,8 @@ namespace RoomCReconstruction {
     while (indexList.size() > 3) {
       for (int i = 0; i < indexList.size(); i++) {
         std::uint32_t a = indexList[i];
-        std::uint32_t b = indexList[getCircularIndex(indexList.size(), i-1)];
-        std::uint32_t c = indexList[getCircularIndex(indexList.size(), i+1)];
+        std::uint32_t b = indexList[getCircularIndex(indexList.size(), reversed ? i+1:i-1)];
+        std::uint32_t c = indexList[getCircularIndex(indexList.size(), reversed ? i-1:i+1)];
 
         //std::cout << a << ", " << b << ", " << c;
 
@@ -193,6 +200,23 @@ namespace RoomCReconstruction {
     return true;
   }
 
+
+  double computePolygonArea(const std::vector<Eigen::Vector2d>& vertices) {
+    double area = 0;
+
+    for (int i = 0; i < vertices.size(); i++) {
+      Eigen::Vector2d va = vertices[i];
+      Eigen::Vector2d vb = vertices[getCircularIndex(vertices.size(), i+1)];
+
+      double width = vb[0] - va[0];       // Width of "virtual rectangle"
+      double height = (vb[1] + va[1]) / 2; // Height from axis to "virtual rectangle"
+
+      area += width*height;
+    }
+
+    return area;
+  }
+
   double cross2d(Eigen::Vector2d a, Eigen::Vector2d b) {
     return a[0] * b[1] - a[1] * b[0];
   }
@@ -229,6 +253,9 @@ int getCircularIndex(int arraySize, int index) {
   } else {
     return index;
   }
+}
+double formatDouble(double d, int digits) {
+  return ((int) (d*std::pow(10, digits))) / (double) std::pow(10, digits);
 }
 }
 

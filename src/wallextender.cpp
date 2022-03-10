@@ -26,6 +26,10 @@ namespace RoomCReconstruction {
 
     bool debugFracs = false;
 
+    // Notes:
+    // Assertions: Point cloud with meter scale
+
+
     void extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
                          const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing) {
 
@@ -89,7 +93,7 @@ namespace RoomCReconstruction {
 
         // Remove small clusters
         for (auto it = clusters.begin(); it != clusters.end(); it++) {
-          if ((*it).points.size() < 20) {
+          if ((*it).points.size() < 200) {
             clusters.erase(it--);
           }
         }
@@ -299,7 +303,8 @@ namespace RoomCReconstruction {
       std::cout << "Parsing Cubes...\n";
       std::vector<Eigen::Vector3d> vertices;
       std::vector<std::uint32_t> faces;
-      for (int i = 0; i < rCX; i++) {
+
+      /*for (int i = 0; i < rCX; i++) {
         for (int j = 0; j < rCY; j++) {
           bool found = false;
           bool recentFound = false;
@@ -316,7 +321,7 @@ namespace RoomCReconstruction {
             }
           }
         }
-      }
+      }*/
 
 
 
@@ -393,11 +398,11 @@ namespace RoomCReconstruction {
                 }
 
                 std::vector<Eigen::Vector2d> flatpointsC1 =
-                  transformPlanePointsTo2D(c1, cornerPoint, edgeLine1, edgeLine2);
+                  transformPlanePointsTo2D(cornerPoint, c1.normal, c1.pointsReal, edgeLine1, edgeLine2);
                 std::vector<Eigen::Vector2d> flatpointsC2 =
-                  transformPlanePointsTo2D(c2, cornerPoint, edgeLine1, edgeLine3);
+                  transformPlanePointsTo2D(cornerPoint, c2.normal, c2.pointsReal, edgeLine1, edgeLine3);
                 std::vector<Eigen::Vector2d> flatpointsC3 =
-                  transformPlanePointsTo2D(c3, cornerPoint, edgeLine2, edgeLine3);
+                  transformPlanePointsTo2D(cornerPoint, c3.normal, c3.pointsReal, edgeLine2, edgeLine3);
 
                 const auto calcBoundaries{
                   [](std::vector<Eigen::Vector2d> fP) -> std::array<double, 4> {
@@ -498,71 +503,132 @@ namespace RoomCReconstruction {
                   int curNX = 0;
                   int curNY = 0;
 
-                  const double minimumRequiredOccupation = 0.3;
+                  const double minimumRequiredOccupation = 0.2;
 
                   bool running = true;
                   int maxDist = std::max(std::max(nmbPosXPieces, nmbPosYPieces),
                                          std::max(nmbNegXPieces, nmbNegYPieces));
-                  for (int dst = 0; dst < maxDist; dst++) {
-                    if (dst < nmbPosXPieces - 1 && dst < maxAbsXint) {
 
+                  // When we already added sth. and then don't add for 3 times in a row, quit iterating over this direction
+                  // Idea: If a cluster contains multiple separate parts across the room, sonly stick to the one closest to the corner.
+                  int notAddedX = -1;
+                  int notAddedY = -1;
+                  int notAddedNX = -1;
+                  int notAddedNY = -1;
+
+                  if (debugFracs) {
+                    std::cout << "Going to iterate over distances: "
+                              << (nmbPosXPieces - 1) << "_" << maxAbsXint << ","
+                              << (nmbPosYPieces - 1) << "_" << maxAbsYint << ","
+                              << (nmbNegXPieces - 1) << "_" << maxAbsXint << ","
+                              << (nmbNegYPieces - 1) << "_" << maxAbsYint << "\n";
+                  }
+
+                  // We don't want to make an assumption just out of the first 0.1m. So start at 2 (0.2m)
+                  for (int dst = 2; dst < maxDist; dst++) {
+                    bool addedOneX = false;
+                    bool addedOneY = false;
+                    bool addedOneNX = false;
+                    bool addedOneNY = false;
+
+                    if (dst < nmbPosXPieces - 1 && dst < maxAbsXint && notAddedX != 0) {
+                      if (debugFracs) std::cout << "Increasing X from: " << curX << " to " << dst << "\n";
                       curX = dst;
+
                       for (int t = 0; t < curY; t++) {
-                        if (flatQuadrats1[curX][t])
+                        if (flatQuadrats1[curX][t]) {
                           summed1++;
+                          addedOneX = true;
+                          if (notAddedY < 0) addedOneY = true;
+                        }
                       }
                       for (int t = 0; t < curNY; t++) {
-                        if (flatQuadrats2[curX][t])
+                        if (flatQuadrats2[curX][t]) {
                           summed2++;
+                          addedOneX = true;
+                          if (notAddedNY < 0) addedOneNY = true;
+                        }
                       }
+
                     }
-                    if (dst < nmbPosYPieces - 1 && dst < maxAbsYint) {
+
+
+                    if (dst < nmbPosYPieces - 1 && dst < maxAbsYint && notAddedY != 0) {
+                      if (debugFracs) std::cout << "Increasing Y from: " << curY << " to " << dst << "\n";
                       curY = dst;
                       for (int t = 0; t < curX; t++) {
-                        if (flatQuadrats1[t][curY])
+                        if (flatQuadrats1[t][curY]) {
                           summed1++;
+                          addedOneY = true;
+                          if (notAddedX < 0) addedOneX = true;
+                        }
                       }
                       for (int t = 0; t < curNX; t++) {
-                        if (flatQuadrats3[t][curY])
+                        if (flatQuadrats3[t][curY]) {
                           summed3++;
+                          addedOneY = true;
+                          if (notAddedNX < 0) addedOneNX = true;
+                        }
                       }
                     }
-                    if (dst < nmbNegXPieces - 1 && dst < maxAbsXint) {
+                    if (dst < nmbNegXPieces - 1 && dst < maxAbsXint && notAddedNX != 0) {
+                      if (debugFracs) std::cout << "Increasing NX from: " << curNX << " to " << dst << "\n";
                       curNX = dst;
                       for (int t = 0; t < curY; t++) {
-                        if (flatQuadrats3[curNX][t])
+                        if (flatQuadrats3[curNX][t]) {
                           summed3++;
+                          addedOneNX = true;
+                          if (notAddedY < 0) addedOneY = true;
+                        }
                       }
                       for (int t = 0; t < curNY; t++) {
-                        if (flatQuadrats4[curNX][t])
+                        if (flatQuadrats4[curNX][t]) {
                           summed4++;
+                          addedOneNX = true;
+                          if (notAddedNY < 0) addedOneNY = true;
+                        }
                       }
                     }
-                    if (dst < nmbNegYPieces - 1 && dst < maxAbsYint) {
+                    if (dst < nmbNegYPieces - 1 && dst < maxAbsYint && notAddedNY != 0) {
+                      if (debugFracs) std::cout << "Increasing NY from: " << curNY << " to " << dst << "\n";
                       curNY = dst;
                       for (int t = 0; t < curX; t++) {
-                        if (flatQuadrats2[t][curNY])
+                        if (flatQuadrats2[t][curNY]) {
                           summed2++;
+                          addedOneNY = true;
+                          if (notAddedX < 0) addedOneX = true;
+                        }
                       }
                       for (int t = 0; t < curNX; t++) {
-                        if (flatQuadrats4[t][curNY])
+                        if (flatQuadrats4[t][curNY]){
                           summed4++;
+                          addedOneNY = true;
+                          if (notAddedNX < 0) addedOneNX = true;
+                        }
                       }
                     }
+
+                    if (addedOneX) {notAddedX = 2;} else if (notAddedX!=0) {notAddedX--;}
+                    if (addedOneY) {notAddedY = 2;} else if (notAddedY!=0) {notAddedY--;}
+                    if (addedOneNX) {notAddedNX = 2;} else if (notAddedNX!=0) {notAddedNX--;}
+                    if (addedOneNY) {notAddedNY = 2;} else if (notAddedNY!=0) {notAddedNY--;}
 
                     double quad1Frac = (curX * curY) == 0 ? 0 : (double)summed1 / (curX * curY);
                     double quad2Frac = (curX * curNY) == 0 ? 0 : (double)summed2 / (curX * curNY);
                     double quad3Frac = (curNX * curY) == 0 ? 0 : (double)summed3 / (curNX * curY);
                     double quad4Frac = (curNX * curNY) == 0 ? 0 : (double)summed4 / (curNX * curNY);
 
-                    if (debugFracs)
+                    if (debugFracs){
                       std::cout << "Dist:" << dst << ", Fracs: " << quad1Frac << ", " << quad2Frac
                                 << ", " << quad3Frac << ", " << quad4Frac << "\n";
+                      std::cout << "NotAddeds: " << notAddedX << "," << notAddedY << "," << notAddedNX << "," << notAddedNY;
+                    }
+
 
                     double reqOccup =
-                      gaussian_1d((double)dst / maxDist, 1.0 - minimumRequiredOccupation, 0.0, 0.4);
+                      gaussian_1d((double)dst / maxDist, 1.0 - minimumRequiredOccupation, 0.0, 0.05);
                     reqOccup += minimumRequiredOccupation;
-                    // std::cout << "Required Occupaction: " << reqOccup << ", dst: " << dst << ", maxDst: " << maxDist << "\n";
+                    if (debugFracs) {std::cout << "Required Occupaction: " << reqOccup << ", dst: " << dst << ", maxDst: " << maxDist << "\n";}
 
                     // Todo: Allow also 3 full and 1 empty quadrant
                     if (quad1Frac > reqOccup && quad2Frac < 0.2 && quad3Frac < 0.2 &&
@@ -669,22 +735,22 @@ namespace RoomCReconstruction {
                   return -1;
                 }};*/
 
-/*
-                if (wallClusterIndices[i] == 23 || wallClusterIndices[i] == 17 ||
-                    wallClusterIndices[j] == 23 || wallClusterIndices[j] == 17) {
+
+                if (k == 2 && i == 3 && j == 25) {
                   debugFracs = true;
-                } else {
-                  debugFracs = false;
-                }
-                std::cout << "Trying Combination: i:" << i << ",j:" << j
-                          << ",c1:" << k << ",c2:" << wallClusterIndices[i]
-                          << ",c3:" << wallClusterIndices[j] << "\n";
-                if ((wallClusterIndices[i] == 23 && wallClusterIndices[j] == 34) ||
-                    (wallClusterIndices[j] == 23 && wallClusterIndices[i] == 34)) {
+
+                  std::cout << "Trying Combination: i:" << i << ",j:" << j
+                            << ",c1:" << k << ",c2:" << i
+                            << ",c3:" << j << "\n";
                   writePoints("A_DEBUG_bla1.ply", simple2Dto3D(flatpointsC1));
                   writePoints("A_DEBUG_bla2.ply", simple2Dto3D(flatpointsC2));
                   writePoints("A_DEBUG_bla3.ply", simple2Dto3D(flatpointsC3));
-                }*/
+                } else {
+                  debugFracs = false;
+                }
+
+
+
 
                 std::array<double, 4> boundC1 = calcBoundaries(flatpointsC1);
                 std::array<double, 4> boundC2 = calcBoundaries(flatpointsC2);
@@ -878,6 +944,7 @@ namespace RoomCReconstruction {
       std::cout << "Setup links between triangles...";
       for (int jj = 0; jj < intersection_triangles.size(); jj++) {
         intersection_triangles[jj].findPossibleFollowers(intersection_triangles, jj);
+        intersection_triangles[jj].sortPossibilities();
       }
       std::cout << "\n";
 
@@ -908,16 +975,45 @@ namespace RoomCReconstruction {
           }
 
 
+
+          std::vector<Eigen::Vector3d> vertices123;
+          std::vector<std::uint32_t> faces123;
           for (ClusterPolygon cp : polygons) {
             std::cout << "Cidx: " << cp.idxCluster << "\n";
-            for (Eigen::Vector3d pnt : cp.points) {
-              std::cout << "[" << pnt[0] << "," << pnt[1] << "," << pnt[2] << "], ";
+            std::vector<Eigen::Vector3d> c_pnts;
+            for (int tri : cp.triangles) {
+              c_pnts.push_back(intersection_triangles[tri].corner);
+            }
+
+            for (Eigen::Vector3d pnt : c_pnts) {
+              std::cout << "[" << formatDouble(pnt[0], 2) << "," << formatDouble(pnt[1], 2) << "," << formatDouble(pnt[2], 2) << "], ";
             }
             std::cout << "\n";
+
+
+            // Calculate 2 perpendicular vectors to the normal. These are required and define the axis in 2D.
+            Eigen::Vector3d a1 = calcPerpendicular(clusters[cp.idxCluster].normal);
+            Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, clusters[cp.idxCluster].normal);
+            Eigen::Vector3d a2 = rotationMatrix * a1;
+
+            std::vector<std::uint32_t> facesTT;
+            std::vector<Eigen::Vector2d> tempPnts = transformPlanePointsTo2D(clusters[cp.idxCluster].center, clusters[cp.idxCluster].normal, c_pnts, a1, a2);
+            std::cout << ", tempPnts-size: " << tempPnts.size();
+            earClippingPolygon(tempPnts, facesTT);
+            std::cout << ", FacesTT-size: " << facesTT.size();
+            appendVerticesFaces(vertices123, faces123, c_pnts, facesTT);
+            std::cout << ", Faces123-size: " << faces123.size() << "\n";
           }
+
+          writePointsWithFaces("A_NEWRoom.ply", vertices123, faces123);
           break;
         } else {
-          std::cout << "Didn't found anything :(\n";
+          std::cout << "Didn't find anything :(\n";
+          for (TriangleNode3D& t : intersection_triangles) {
+            t.chosen[0] = -1;
+            t.chosen[1] = -1;
+            t.chosen[2] = -1;
+          }
         }
 
         /*std::vector<ExtStr> resArr123456 = findPossibleExtensions(intersection_triangles, exc, jj);
@@ -957,11 +1053,11 @@ namespace RoomCReconstruction {
       for (int i = 0; i < intersection_triangles.size(); i++) {
         TriangleNode3D& t = intersection_triangles[i];
         arrows.push_back(t.corner);
-        arrows.push_back(t.corner+t.arrows[0]);
+        arrows.push_back(t.corner+0.1*t.arrows[0]);
         arrows.push_back(t.corner);
-        arrows.push_back(t.corner+t.arrows[1]);
+        arrows.push_back(t.corner+0.1*t.arrows[1]);
         arrows.push_back(t.corner);
-        arrows.push_back(t.corner+t.arrows[2]);
+        arrows.push_back(t.corner+0.1*t.arrows[2]);
         arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
         arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
         arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
@@ -980,17 +1076,17 @@ namespace RoomCReconstruction {
         TriangleNode3D& t = intersection_triangles[i];
         if (t.isInvalid()) continue;
         arrows2.push_back(t.corner);
-        arrows2.push_back(t.corner+t.arrows[0]);
+        arrows2.push_back(t.corner+0.1*t.arrows[0]);
         arrows2.push_back(t.corner);
-        arrows2.push_back(t.corner+t.arrows[1]);
+        arrows2.push_back(t.corner+0.1*t.arrows[1]);
         arrows2.push_back(t.corner);
-        arrows2.push_back(t.corner+t.arrows[2]);
+        arrows2.push_back(t.corner+0.1*t.arrows[2]);
         arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(0), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
         arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(1), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
         arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(2), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
       }
       writeEdgesWColors("output_clustering_7_arrows_linked.ply", arrows2, arrowColors2);
 
@@ -1445,20 +1541,20 @@ namespace RoomCReconstruction {
       Eigen::Vector3d currentNormal = c1.normal;
       double angle = safe_acos(c2.normal.dot(currentNormal) /
                                (c2.normal.norm() * currentNormal.norm()));
-      double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 8);
+      double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 32);
 
       Eigen::Vector3d currentNormal2 = -c1.normal;
       double angle2 = safe_acos(c2.normal.dot(currentNormal2) /
                                (c2.normal.norm() * currentNormal2.norm()));
-      double gaussian_angle2 = gaussian_1d(angle2, 1.0, 0.0, std::numbers::pi_v<double> / 8);
+      double gaussian_angle2 = gaussian_1d(angle2, 1.0, 0.0, std::numbers::pi_v<double> / 32);
 
       return !(gaussian_angle > 0.6) && !(gaussian_angle2 > 0.6);
     }
 
 
     void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::Vector3d arrow, std::array<int, 2> res) {
-      std::vector<Eigen::Vector2d> flatpointsC1 = transformPlanePointsTo2D(c1, corner, arrow, rotateAround(arrow, c1.normal));
-      std::vector<Eigen::Vector2d> flatpointsC2 = transformPlanePointsTo2D(c2, corner, arrow, rotateAround(arrow, c2.normal));
+      std::vector<Eigen::Vector2d> flatpointsC1 = transformPlanePointsTo2D(corner, c1.normal, c1.pointsReal, arrow, rotateAround(arrow, c1.normal));
+      std::vector<Eigen::Vector2d> flatpointsC2 = transformPlanePointsTo2D(corner, c2.normal, c2.pointsReal, arrow, rotateAround(arrow, c2.normal));
 
       for (Eigen::Vector2d p : flatpointsC1) {
         if (p[1] > 0) {res[0]++;} else {res[1]++;}
@@ -1472,26 +1568,26 @@ namespace RoomCReconstruction {
       Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, aroundRotate);
       return rotationMatrix * toRotate;
     }
-    std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Cluster c, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2) {
+    std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d center, Eigen::Vector3d normal, const std::vector<Eigen::Vector3d>& pnts, Eigen::Vector3d a1, Eigen::Vector3d a2) {
       assert (c.normal.dot(a1) > 0.001);
       assert (c.normal.dot(a2) > 0.001);
-      assert (a1.dot(a2) > 0.001);
+      //assert (a1.dot(a2) > 0.001);     // Not anymore, also accepts a1 and a2 not orthogonal.
 
       std::vector <Eigen::Vector2d> points2D;
 
-      for (int i = 0; i < c.pointsReal.size(); i++) {
+      for (int i = 0; i < pnts.size(); i++) {
         //points2D.emplace_back(Eigen::Vector2d{a1.dot(c.pointsReal[i] - center), a2.dot(c.pointsReal[i] - center)});
-        Eigen::Vector3d N = a1.cross(c.normal);
+        Eigen::Vector3d N = a1.cross(normal);
         Eigen::Vector3d V = center;
         Eigen::Vector3d D = -a2;
-        Eigen::Vector3d P = c.pointsReal[i];
+        Eigen::Vector3d P = pnts[i];
 
         double x123 = ((V-P).dot(N)) / N.dot(D);
 
-        Eigen::Vector3d N2 = a2.cross(c.normal);
+        Eigen::Vector3d N2 = a2.cross(normal);
         Eigen::Vector3d V2 = center;
         Eigen::Vector3d D2 = -a1;
-        Eigen::Vector3d P2 = c.pointsReal[i];
+        Eigen::Vector3d P2 = pnts[i];
 
         double y123 = ((V2-P2).dot(N2)) / N2.dot(D2);
 

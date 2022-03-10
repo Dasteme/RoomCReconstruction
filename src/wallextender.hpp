@@ -472,7 +472,7 @@ bool checkSomewhatOrthogonal(Cluster c1, Cluster c2);
 
 void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::Vector3d arrow, std::array<int, 2> res);
 Eigen::Vector3d rotateAround(Eigen::Vector3d toRotate, Eigen::Vector3d aroundRotate);
-std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Cluster c, Eigen::Vector3d center, Eigen::Vector3d a1, Eigen::Vector3d a2);
+std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d center, Eigen::Vector3d normal, const std::vector<Eigen::Vector3d>& pnts, Eigen::Vector3d a1, Eigen::Vector3d a2);
 
 
 
