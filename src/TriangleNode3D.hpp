@@ -27,6 +27,7 @@ struct ExtStr2 {
   int myTriangle;
   int opposingTriangle;
   double dist;
+  double inventedLen;
   int myArrow;
   int opposingArrow;
 };
@@ -53,11 +54,17 @@ struct ExtStr2 {
     // arrow[0] is contour of C2 and C3
     std::array<Eigen::Vector3d, 3> arrows;
 
+    std::array<double, 3> suggestedLengths;
+
+    bool inwardsTriangle;
+
     TriangleNode3D(int idxC1_p,
                          int idxC2_p,
                          int idxC3_p,
                          Eigen::Vector3d corner_p,
-                         std::array<Eigen::Vector3d, 3> arrows_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(corner_p),arrows(arrows_p)
+                         std::array<Eigen::Vector3d, 3> arrows_p,
+                         std::array<double, 3> suggestedLengths_p,
+                        bool inwardsTriangle_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(corner_p),arrows(arrows_p),suggestedLengths(suggestedLengths_p),inwardsTriangle(inwardsTriangle_p)
     {
       possibilites = {std::vector<ExtStr2>(), std::vector<ExtStr2>(), std::vector<ExtStr2>()};
       chosen = {-1, -1, -1};
@@ -165,7 +172,13 @@ struct ExtStr2 {
               // Check if arrows are opposing like --->   <---, and not <---  ---->
               // For this, corner to the other corner must be smaller than when added the arrow
               if ((t.corner - this->corner).norm() < ((t.corner - this->corner)+this->arrows[myArrowIdx]).norm()) {
-                possibilites[myArrowIdx].push_back({myIdx, i, (t.corner - this->corner).norm(), myArrowIdx, followingArrayIdx});
+                Eigen::Vector3d difference = -(this->arrows[myArrowIdx]*this->suggestedLengths[myArrowIdx])
+                                             - this->corner
+                                             + t.corner
+                                             + (t.arrows[followingArrayIdx]*t.suggestedLengths[followingArrayIdx]);
+                double inventedLen = vectorsHaveSameDirection(this->arrows[myArrowIdx], difference) ? difference.norm():0;
+
+                possibilites[myArrowIdx].push_back({myIdx, i, (t.corner - this->corner).norm(), inventedLen, myArrowIdx, followingArrayIdx});
               }
 
             }
@@ -178,8 +191,11 @@ struct ExtStr2 {
 
 
     void sortPossibilities() {
-      const auto comparePoss{[](ExtStr2 e1, ExtStr2 e2) -> bool {
+      /*const auto comparePoss{[](ExtStr2 e1, ExtStr2 e2) -> bool {
         return !(e1.dist > e2.dist);
+      }};*/
+      const auto comparePoss{[](ExtStr2 e1, ExtStr2 e2) -> bool {
+        return (e1.inventedLen < e2.inventedLen);
       }};
 
       for (int i = 0; i < 3; i++) {
@@ -312,6 +328,11 @@ struct ExtStr2 {
         }
       }
       return false;
+    }
+
+    // Note:
+    bool vectorsHaveSameDirection(Eigen::Vector3d v1, Eigen::Vector3d v2) {
+      return v1.dot(v2) > 0;
     }
 
     void print(std::vector<TriangleNode3D>& allTriangles) {

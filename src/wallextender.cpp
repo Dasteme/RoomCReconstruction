@@ -272,8 +272,9 @@ namespace RoomCReconstruction {
           }
         }
       }
-
+/*
       std::cout << "Add points to Cubes...\n";
+
       for (int i = 0; i != clusters.size(); ++i) {
         for (int j = 0; j < clusters[i].pointsReal.size(); j++) {
           auto pnt = clusters[i].pointsReal[j];
@@ -287,7 +288,7 @@ namespace RoomCReconstruction {
         }
 
       }
-
+*/
 
 /*
       for (int i = 0; i < rCX; i++) {
@@ -365,6 +366,7 @@ namespace RoomCReconstruction {
 
       for (int k = 0; k < clusters.size(); k++) {
         for (int i = k+1; i < clusters.size(); i++) {
+          std::cout << "Finding Triangles: " << k << "," << i << "\n";
           if (!checkSomewhatOrthogonal(clusters[k], clusters[i])) continue;
           for (int j = i + 1; j < clusters.size(); j++) {
             if (!checkSomewhatOrthogonal(clusters[k], clusters[j])) continue;
@@ -375,6 +377,8 @@ namespace RoomCReconstruction {
                                                         clusters[j],
                                                         cornerPoint)) {
               if (insideBB(cornerPoint)) {
+                std::cout << "Intersection: " << k << "," << i << "," << j << "\n";
+
                 corners.push_back(cornerPoint);
                 cornerColors.push_back(colorGreen);
 
@@ -405,7 +409,7 @@ namespace RoomCReconstruction {
                   transformPlanePointsTo2D(cornerPoint, c3.normal, c3.pointsReal, edgeLine2, edgeLine3);
 
                 const auto calcBoundaries{
-                  [](std::vector<Eigen::Vector2d> fP) -> std::array<double, 4> {
+                  [](const std::vector<Eigen::Vector2d>& fP) -> std::array<double, 4> {
                     double minX = 0; // Note that we all set to 0 instead of "max double".
                     double maxX = 0;
                     double minY = 0;
@@ -432,311 +436,11 @@ namespace RoomCReconstruction {
                   }
                 };
 
-                // Calculates score for current arrow direction and flipped direction.
-                // The higher the score, the more likely the arrow is correct
-                // Note that x-axis of flatpoints is arrow1, y-axis is arrow2
-                //
-                // Adaption: Now it returns the suspected quadrant
-                const auto calcArrowScore{ [](std::vector<Eigen::Vector2d> fP,
-                                              double xPosAxisLen,
-                                              double xNegAxisLen,
-                                              double yPosAxisLen,
-                                              double yNegAxisLen,
-                                              double maxAbsX,
-                                              double maxAbsY) -> int {
-                  std::array<double, 2> res = { 0, 0 };
-
-                  double arrowPiecesSize = 0.1;
-
-                  int maxAbsXint = std::ceil(maxAbsX / arrowPiecesSize);
-                  int maxAbsYint = std::ceil(maxAbsY / arrowPiecesSize);
-
-                  int nmbPosXPieces = std::ceil((xPosAxisLen) / arrowPiecesSize);
-                  int nmbNegXPieces = std::ceil((xNegAxisLen) / arrowPiecesSize);
-                  int nmbPosYPieces = std::ceil((yPosAxisLen) / arrowPiecesSize);
-                  int nmbNegYPieces = std::ceil((yNegAxisLen) / arrowPiecesSize);
-
-                  /*std::cout << "Nmbrs: " << nmbPosXPieces << ", " << nmbNegXPieces << ", "
-                            << nmbPosYPieces << ", " << nmbNegYPieces << "\n";*/
-
-                  std::vector<int> xPositivePieces(nmbPosXPieces, 0);
-                  std::vector<int> xNegativePieces(nmbNegXPieces, 0);
-                  std::vector<int> yPositivePieces(nmbPosYPieces, 0);
-                  std::vector<int> yNegativePieces(nmbNegYPieces, 0);
-
-                  std::vector<std::vector<bool>> flatQuadrats1(
-                    nmbPosXPieces, std::vector<bool>(nmbPosYPieces, false));
-                  std::vector<std::vector<bool>> flatQuadrats2(
-                    nmbPosXPieces, std::vector<bool>(nmbNegYPieces, false));
-                  std::vector<std::vector<bool>> flatQuadrats3(
-                    nmbNegXPieces, std::vector<bool>(nmbPosYPieces, false));
-                  std::vector<std::vector<bool>> flatQuadrats4(
-                    nmbNegXPieces, std::vector<bool>(nmbNegYPieces, false));
-
-                  for (Eigen::Vector2d p1 : fP) {
-                    if (p1[0] >= 0 && p1[1] >= 0) { // x,y positive
-                      flatQuadrats1[(int)std::floor(p1[0] / arrowPiecesSize)]
-                                   [(int)std::floor(p1[1] / arrowPiecesSize)] = true;
-                    } else if (p1[0] >= 0 && p1[1] < 0) { // x positive, y negative
-                      flatQuadrats2[(int)std::floor(p1[0] / arrowPiecesSize)]
-                                   [(int)std::floor(-p1[1] / arrowPiecesSize)] = true;
-                    } else if (p1[0] < 0 && p1[1] >= 0) { // x negative, y positive
-                      flatQuadrats3[(int)std::floor(-p1[0] / arrowPiecesSize)]
-                                   [(int)std::floor(p1[1] / arrowPiecesSize)] = true;
-                    } else if (p1[0] < 0 && p1[1] < 0) { // x,y negative
-                      flatQuadrats4[(int)std::floor(-p1[0] / arrowPiecesSize)]
-                                   [(int)std::floor(-p1[1] / arrowPiecesSize)] = true;
-                    }
-                  }
-
-                  // Grow from 0,0 in a rather circular way
-
-                  int summed1 = 0;
-                  int summed2 = 0;
-                  int summed3 = 0;
-                  int summed4 = 0;
-
-                  int distance = 0;
-
-                  int curX = 0;
-                  int curY = 0;
-                  int curNX = 0;
-                  int curNY = 0;
-
-                  const double minimumRequiredOccupation = 0.2;
-
-                  bool running = true;
-                  int maxDist = std::max(std::max(nmbPosXPieces, nmbPosYPieces),
-                                         std::max(nmbNegXPieces, nmbNegYPieces));
-
-                  // When we already added sth. and then don't add for 3 times in a row, quit iterating over this direction
-                  // Idea: If a cluster contains multiple separate parts across the room, sonly stick to the one closest to the corner.
-                  int notAddedX = -1;
-                  int notAddedY = -1;
-                  int notAddedNX = -1;
-                  int notAddedNY = -1;
-
-                  if (debugFracs) {
-                    std::cout << "Going to iterate over distances: "
-                              << (nmbPosXPieces - 1) << "_" << maxAbsXint << ","
-                              << (nmbPosYPieces - 1) << "_" << maxAbsYint << ","
-                              << (nmbNegXPieces - 1) << "_" << maxAbsXint << ","
-                              << (nmbNegYPieces - 1) << "_" << maxAbsYint << "\n";
-                  }
-
-                  // We don't want to make an assumption just out of the first 0.1m. So start at 2 (0.2m)
-                  for (int dst = 2; dst < maxDist; dst++) {
-                    bool addedOneX = false;
-                    bool addedOneY = false;
-                    bool addedOneNX = false;
-                    bool addedOneNY = false;
-
-                    if (dst < nmbPosXPieces - 1 && dst < maxAbsXint && notAddedX != 0) {
-                      if (debugFracs) std::cout << "Increasing X from: " << curX << " to " << dst << "\n";
-                      curX = dst;
-
-                      for (int t = 0; t < curY; t++) {
-                        if (flatQuadrats1[curX][t]) {
-                          summed1++;
-                          addedOneX = true;
-                          if (notAddedY < 0) addedOneY = true;
-                        }
-                      }
-                      for (int t = 0; t < curNY; t++) {
-                        if (flatQuadrats2[curX][t]) {
-                          summed2++;
-                          addedOneX = true;
-                          if (notAddedNY < 0) addedOneNY = true;
-                        }
-                      }
-
-                    }
-
-
-                    if (dst < nmbPosYPieces - 1 && dst < maxAbsYint && notAddedY != 0) {
-                      if (debugFracs) std::cout << "Increasing Y from: " << curY << " to " << dst << "\n";
-                      curY = dst;
-                      for (int t = 0; t < curX; t++) {
-                        if (flatQuadrats1[t][curY]) {
-                          summed1++;
-                          addedOneY = true;
-                          if (notAddedX < 0) addedOneX = true;
-                        }
-                      }
-                      for (int t = 0; t < curNX; t++) {
-                        if (flatQuadrats3[t][curY]) {
-                          summed3++;
-                          addedOneY = true;
-                          if (notAddedNX < 0) addedOneNX = true;
-                        }
-                      }
-                    }
-                    if (dst < nmbNegXPieces - 1 && dst < maxAbsXint && notAddedNX != 0) {
-                      if (debugFracs) std::cout << "Increasing NX from: " << curNX << " to " << dst << "\n";
-                      curNX = dst;
-                      for (int t = 0; t < curY; t++) {
-                        if (flatQuadrats3[curNX][t]) {
-                          summed3++;
-                          addedOneNX = true;
-                          if (notAddedY < 0) addedOneY = true;
-                        }
-                      }
-                      for (int t = 0; t < curNY; t++) {
-                        if (flatQuadrats4[curNX][t]) {
-                          summed4++;
-                          addedOneNX = true;
-                          if (notAddedNY < 0) addedOneNY = true;
-                        }
-                      }
-                    }
-                    if (dst < nmbNegYPieces - 1 && dst < maxAbsYint && notAddedNY != 0) {
-                      if (debugFracs) std::cout << "Increasing NY from: " << curNY << " to " << dst << "\n";
-                      curNY = dst;
-                      for (int t = 0; t < curX; t++) {
-                        if (flatQuadrats2[t][curNY]) {
-                          summed2++;
-                          addedOneNY = true;
-                          if (notAddedX < 0) addedOneX = true;
-                        }
-                      }
-                      for (int t = 0; t < curNX; t++) {
-                        if (flatQuadrats4[t][curNY]){
-                          summed4++;
-                          addedOneNY = true;
-                          if (notAddedNX < 0) addedOneNX = true;
-                        }
-                      }
-                    }
-
-                    if (addedOneX) {notAddedX = 2;} else if (notAddedX!=0) {notAddedX--;}
-                    if (addedOneY) {notAddedY = 2;} else if (notAddedY!=0) {notAddedY--;}
-                    if (addedOneNX) {notAddedNX = 2;} else if (notAddedNX!=0) {notAddedNX--;}
-                    if (addedOneNY) {notAddedNY = 2;} else if (notAddedNY!=0) {notAddedNY--;}
-
-                    double quad1Frac = (curX * curY) == 0 ? 0 : (double)summed1 / (curX * curY);
-                    double quad2Frac = (curX * curNY) == 0 ? 0 : (double)summed2 / (curX * curNY);
-                    double quad3Frac = (curNX * curY) == 0 ? 0 : (double)summed3 / (curNX * curY);
-                    double quad4Frac = (curNX * curNY) == 0 ? 0 : (double)summed4 / (curNX * curNY);
-
-                    if (debugFracs){
-                      std::cout << "Dist:" << dst << ", Fracs: " << quad1Frac << ", " << quad2Frac
-                                << ", " << quad3Frac << ", " << quad4Frac << "\n";
-                      std::cout << "NotAddeds: " << notAddedX << "," << notAddedY << "," << notAddedNX << "," << notAddedNY;
-                    }
-
-
-                    double reqOccup =
-                      gaussian_1d((double)dst / maxDist, 1.0 - minimumRequiredOccupation, 0.0, 0.05);
-                    reqOccup += minimumRequiredOccupation;
-                    if (debugFracs) {std::cout << "Required Occupaction: " << reqOccup << ", dst: " << dst << ", maxDst: " << maxDist << "\n";}
-
-                    // Todo: Allow also 3 full and 1 empty quadrant
-                    if (quad1Frac > reqOccup && quad2Frac < 0.2 && quad3Frac < 0.2 &&
-                        quad4Frac < 0.2)
-                      return 1;
-                    if (quad1Frac < 0.2 && quad2Frac > reqOccup && quad3Frac < 0.2 &&
-                        quad4Frac < 0.2)
-                      return 2;
-                    if (quad1Frac < 0.2 && quad2Frac < 0.2 && quad3Frac > reqOccup &&
-                        quad4Frac < 0.2)
-                      return 3;
-                    if (quad1Frac < 0.2 && quad2Frac < 0.2 && quad3Frac < 0.2 &&
-                        quad4Frac > reqOccup)
-                      return 4;
-
-                    if (quad1Frac < 0.2 && quad2Frac > reqOccup && quad3Frac > reqOccup &&
-                        quad4Frac > reqOccup)
-                      return 1;
-                    if (quad1Frac > reqOccup && quad2Frac < 0.2 && quad3Frac > reqOccup &&
-                        quad4Frac > reqOccup)
-                      return 2;
-                    if (quad1Frac > reqOccup && quad2Frac > reqOccup && quad3Frac < 0.2 &&
-                        quad4Frac > reqOccup)
-                      return 3;
-                    if (quad1Frac > reqOccup && quad2Frac > reqOccup && quad3Frac > reqOccup &&
-                        quad4Frac < 0.2)
-                      return 4;
-                  }
-
-                  return 0;
-                } };
-
-                /*const auto calculateQuadrantScores{[](std::vector<Eigen::Vector2d> fP) -> int {
-
-
-                  std::array<double, 4> quadrantScores25{ 0,0,0,0 };
-                  std::array<double, 4> quadrantScores50{ 0,0,0,0 };
-                  std::array<double, 4> quadrantScores100{ 0,0,0,0 };
-                  std::array<double, 4> quadrantScores200{ 0,0,0,0 };
-                  std::array<double, 4> quadrantScores500{ 0,0,0,0 };
-                  for (Eigen::Vector2d p1 : fP) {
-                    int quadrant = -1;
-                    if (p1[0] >= 0 && p1[1] >= 0) {           // x,y positive
-                      quadrant = 0;
-                    } else if (p1[0] >= 0 && p1[1] < 0) {     // x positive, y negative
-                      quadrant = 1;
-                    } else if (p1[0] < 0 && p1[1] >= 0) {     // x negative, y positive
-                      quadrant = 2;
-                    } else if (p1[0] < 0 && p1[1] < 0) {      // x,y negative
-                      quadrant = 3;
-                    }
-                    double distToCenter = std::sqrt(p1[0]*p1[0] + p1[1]*p1[1]);
-                    if (distToCenter <= 0.25) quadrantScores25[quadrant] +=
-                gaussian_1d(distToCenter, 1.0, 0, 0.25); if (distToCenter <= 0.5)
-                quadrantScores50[quadrant] += gaussian_1d(distToCenter, 1.0, 0, 0.5); if
-                (distToCenter <= 1) quadrantScores100[quadrant] += gaussian_1d(distToCenter, 1.0,
-                0, 1.00); if (distToCenter <= 2) quadrantScores200[quadrant] +=
-                gaussian_1d(distToCenter, 1.0, 0, 2.00); if (distToCenter <= 5)
-                quadrantScores500[quadrant] += gaussian_1d(distToCenter, 1.0, 0, 5.00);
-                  }
-                  for (int i = 0; i < 4; i++) {quadrantScores25[i] = quadrantScores25[i] /
-                fP.size();} for (int i = 0; i < 4; i++) {quadrantScores50[i] = quadrantScores50[i] /
-                fP.size();} for (int i = 0; i < 4; i++) {quadrantScores100[i] = quadrantScores100[i]
-                / fP.size();} for (int i = 0; i < 4; i++) {quadrantScores200[i] =
-                quadrantScores200[i] / fP.size();} for (int i = 0; i < 4; i++) {quadrantScores500[i]
-                = quadrantScores500[i] / fP.size();}
-
-                  const auto tenTimesHigherThanOthers{[](std::array<double, 4> quadrantScore) -> int
-                { for (int i = 0; i < 4; i++) { bool found = true; for (int j = 0; j < 4; j++) {
-                          if(j == i) continue;
-                          if (quadrantScore[i] < quadrantScore[j]*10) {found = false; break; }
-                        }
-                        if (found) {
-                          return i;
-                        }
-                      }
-                      return -1;
-                    }};
-                  const auto tenTimesSmallerThanOthers{[](std::array<double, 4> quadrantScore) ->
-                int { for (int i = 0; i < 4; i++) { bool found = true; for (int j = 0; j < 4; j++) {
-                        if(j == i) continue;
-                        if (quadrantScore[i]*10 < quadrantScore[j]) {found = false; break; }
-                      }
-                      if (found) {
-                        return i;
-                      }
-                    }
-                    return -1;
-                  }};
-                  int mainQuadrant25 = tenTimesHigherThanOthers(quadrantScores25);
-                  int mainQuadrant50 = tenTimesHigherThanOthers(quadrantScores50);
-                  int mainQuadrant100 = tenTimesHigherThanOthers(quadrantScores100);
-                  int mainQuadrant200 = tenTimesHigherThanOthers(quadrantScores200);
-                  int mainQuadrant500 = tenTimesHigherThanOthers(quadrantScores500);
-                  if (mainQuadrant25 != -1) {return mainQuadrant25;}
-                  if (mainQuadrant50 != -1) {return mainQuadrant50;}
-                  if (mainQuadrant100 != -1) {return mainQuadrant100;}
-                  if (mainQuadrant200 != -1) {return mainQuadrant200;}
-                  if (mainQuadrant500 != -1) {return mainQuadrant500;}
 
 
 
 
-                  return -1;
-                }};*/
-
-
-                if (k == 2 && i == 3 && j == 25) {
+                if (k == 0 && i == 6 && j == 21) {
                   debugFracs = true;
 
                   std::cout << "Trying Combination: i:" << i << ",j:" << j
@@ -752,15 +456,381 @@ namespace RoomCReconstruction {
 
 
 
+
+
                 std::array<double, 4> boundC1 = calcBoundaries(flatpointsC1);
                 std::array<double, 4> boundC2 = calcBoundaries(flatpointsC2);
                 std::array<double, 4> boundC3 = calcBoundaries(flatpointsC3);
+
+                /*for (const std::array<double, 4>& tt : {boundC1, boundC2, boundC3}) {
+                  std::cout << "BoundariesC1_3: " << tt[0] << "," << tt[1] << "," << tt[2] << "," << tt[3] << "\n";
+                }*/
+
+                int C1_suggestedX = 0;
+                int C1_suggestedY = 0;
+                int C2_suggestedX = 0;
+                int C2_suggestedY = 0;
+                int C3_suggestedX = 0;
+                int C3_suggestedY = 0;
+
+                //calcArrowScoreNEW(flatpointsC1, boundC1, C1_suggestedX, C1_suggestedY);
+                //calcArrowScoreNEW(flatpointsC2, boundC2, C2_suggestedX, C2_suggestedY);
+                //calcArrowScoreNEW(flatpointsC3, boundC3, C3_suggestedX, C3_suggestedY);
+
+
+                const auto computeOccupation{ [](int min_i, int max_i, int min_j, int max_j, std::vector<std::vector<bool>> flatQuadrat) -> double {
+                  /*if (debugFracs) {
+                    std::cout << "occupations_from_to: " << min_i << "to" << max_i << ", " << min_j << "to" << max_j << "\n";
+                  }*/
+
+                  //std::cout << "Computing occ: " << max_i << "," << max_j << "\n";
+                  if ((max_i-min_i) < 1 || (max_j-min_j) < 1) {
+                    std::cout << "computeOccError: distance is smaller than 1\n";
+                  }
+
+                  int summed = 0;
+                  for (int i = min_i; i < max_i; i++) {
+                    for (int j = min_j; j < max_j; j++) {
+                      if (i < flatQuadrat.size() && j < flatQuadrat[i].size()) {  // If i or j is out of boundaries, assume there is an empty flatQ
+                        if (flatQuadrat[i][j]) {
+                          summed++;
+                          //std::cout << "Calculate occupation:" << min_i << ", " << max_i << ", " << min_j << ", " << max_j << "\n";
+                        }
+                      }
+                    }
+                  }
+                  return (double) summed / ((max_i-min_i) * (max_j-min_j));
+                }};
+
+
+                double arrowPiecesSize = 0.2;
+                double emptyRequirement = 0.2; // required empty space behind line, i.e. the minimum thickness of walls.
+
+
+
+
+
+                //double requiredEmptyBorder = 0.2;  // Not used for now
+
+                double max_pos_a1_d = std::max(boundC1[0], boundC2[0]);
+                double max_neg_a1_d = std::max(boundC1[1], boundC2[1]);
+                double max_pos_a2_d = std::max(boundC1[2], boundC3[0]);
+                double max_neg_a2_d = std::max(boundC1[3], boundC3[1]);
+                double max_pos_a3_d = std::max(boundC2[2], boundC3[2]);
+                double max_neg_a3_d = std::max(boundC2[3], boundC3[3]);
+
+                /*std::cout << "Dbls: " << max_pos_a1_d << "," << max_neg_a1_d << "," << max_pos_a2_d
+                          << "," << max_neg_a2_d << "," << max_pos_a3_d << "," << max_neg_a3_d << ",";*/
+
+                const auto applyDiscrete{ [arrowPiecesSize](double len) -> int {
+                  return std::ceil(len / arrowPiecesSize);
+                }};
+                int max_pos_a1 = std::min(applyDiscrete(max_pos_a1_d), 20);
+                int max_neg_a1 = std::min(applyDiscrete(max_neg_a1_d), 20);
+                int max_pos_a2 = std::min(applyDiscrete(max_pos_a2_d), 20);
+                int max_neg_a2 = std::min(applyDiscrete(max_neg_a2_d), 20);
+                int max_pos_a3 = std::min(applyDiscrete(max_pos_a3_d), 20);
+                int max_neg_a3 = std::min(applyDiscrete(max_neg_a3_d), 20);
+
+                /*std::cout << "Dbls: " << max_pos_a1 << "," << max_neg_a1 << "," << max_pos_a2
+                          << "," << max_neg_a2 << "," << max_pos_a3 << "," << max_neg_a3 << ",";*/
+
+                std::array<std::vector<std::vector<bool>>, 3> flatQuadrats = {
+                  std::vector<std::vector<bool>>(max_pos_a1+max_neg_a1, std::vector<bool>(max_pos_a2+max_neg_a2, false)),
+                  std::vector<std::vector<bool>>(max_pos_a1+max_neg_a1, std::vector<bool>(max_pos_a3+max_neg_a3, false)),
+                  std::vector<std::vector<bool>>(max_pos_a2+max_neg_a2, std::vector<bool>(max_pos_a3+max_neg_a3, false))
+                };
+
+
+
+
+
+                //std::cout << "flatQuadrat created\n";
+
+                const auto getMaxNeg{ [max_neg_a1, max_neg_a2, max_neg_a3](bool x_axis, int clIdx) -> int {
+                  if (x_axis) {
+                    return (clIdx==0) ? max_neg_a1:((clIdx==1) ? max_neg_a1:max_neg_a2);
+                  } else {
+                    return (clIdx==0) ? max_neg_a2:((clIdx==1) ? max_neg_a3:max_neg_a3);
+                  }
+                }};
+
+                // Note: Duplicated Code, but works faster than applyDiscrete everytime
+                const auto getMaxNeg_d{ [max_neg_a1_d, max_neg_a2_d, max_neg_a3_d](bool x_axis, int clIdx) -> double {
+                  if (x_axis) {
+                    return (clIdx==0) ? max_neg_a1_d:((clIdx==1) ? max_neg_a1_d:max_neg_a2_d);
+                  } else {
+                    return (clIdx==0) ? max_neg_a2_d:((clIdx==1) ? max_neg_a3_d:max_neg_a3_d);
+                  }
+                }};
+
+
+
+
+
+
+
+
+                const auto computeOccupationSimplifier{ [computeOccupation, getMaxNeg](int x, int y, int cl_idx, std::vector<std::vector<bool>>& flatQuadrat) -> double {
+                  return computeOccupation(((x < 0 ? x:0) + getMaxNeg(true, cl_idx)),
+                                    ((x < 0 ? 0:x) + getMaxNeg(true, cl_idx)),
+                                    ((y < 0 ? y:0) + getMaxNeg(false, cl_idx)),
+                                    ((y < 0 ? 0:y) + getMaxNeg(false, cl_idx)),
+                                           flatQuadrat);
+                }};
+
+                const auto computeOccupationReversedSimplifier{ [computeOccupation, getMaxNeg](int x, int y, int cl_idx, int reversedLen, std::vector<std::vector<bool>>& flatQuadrat) -> double {
+                  return (computeOccupation(((x < 0 ? 0:-reversedLen) + getMaxNeg(true, cl_idx)),
+                                            ((x < 0 ? reversedLen:0) + getMaxNeg(true, cl_idx)),
+                                            ((y < 0 ? y:0) + getMaxNeg(false, cl_idx)),
+                                            ((y < 0 ? 0:y) + getMaxNeg(false, cl_idx)),
+                                            flatQuadrat) +
+                          computeOccupation(((x < 0 ? x:0) + getMaxNeg(true, cl_idx)),
+                                            ((x < 0 ? 0:x) + getMaxNeg(true, cl_idx)),
+                                            ((y < 0 ? 0:-reversedLen) + getMaxNeg(false, cl_idx)),
+                                            ((y < 0 ? reversedLen:0) + getMaxNeg(false, cl_idx)),
+                                            flatQuadrat) +
+                          computeOccupation(((x < 0 ? 0:-reversedLen) + getMaxNeg(true, cl_idx)),
+                                            ((x < 0 ? reversedLen:0) + getMaxNeg(true, cl_idx)),
+                                            ((y < 0 ? 0:-reversedLen) + getMaxNeg(false, cl_idx)),
+                                            ((y < 0 ? reversedLen:0) + getMaxNeg(false, cl_idx)),
+                                            flatQuadrat)) / 3;
+                }};
+
+
+                /*if (k == 7 && i == 15 && j == 16) {
+                  std::cout << "1234145\n";
+                }*/
+
+                for (int i23456 = 0; i23456 < 3; i23456++) {
+                  if (flatQuadrats[i23456].size() == 0) continue;
+
+                  std::vector<Eigen::Vector2d>& fP = (i23456==0) ? flatpointsC1:((i23456==1) ? flatpointsC2:flatpointsC3);
+                  double max_neg_1 = getMaxNeg(true, i23456);
+                  double max_neg_2 = getMaxNeg(false, i23456);
+
+                  if (k == 7 && i == 15 && j == 16) {
+                    std::cout << "max_neg_1: " << max_neg_1 << "\n";
+                    std::cout << "max_neg_2: " << max_neg_2 << "\n";
+                  }
+//                  std::cout << "max_neg_1: " << max_neg_1_d << "\n";
+//                  std::cout << "max_neg_2: " << max_neg_2_d << "\n";
+
+                  for (Eigen::Vector2d& p1 : fP) {
+                    int idxX = ((int) std::floor((p1[0]) / arrowPiecesSize)) + max_neg_1;
+                    int idxY = ((int) std::floor((p1[1]) / arrowPiecesSize)) + max_neg_2;
+
+                    // We have no piece for this point (for example because we limit the searching-radius)
+                    if (idxX > flatQuadrats[i23456].size()-1 || idxY > flatQuadrats[i23456][0].size()-1) continue;
+
+
+//                    std::cout << "AppndPnt: " << idxX << "/" << flatQuadrats[i].size() << ", "
+//                                              << idxY << "/" << flatQuadrats[i][idxX].size() << "\n";
+                    flatQuadrats[i23456][idxX][idxY] = true;
+                  }
+
+                }
+
+
+                const auto printFlatQuadrants{ [getMaxNeg](const std::string& filename, std::vector<std::vector<bool>> flatQuadrat, bool shifted, double arrowPiecesSize, int clidx) -> void {
+                  std::vector<Eigen::Vector3d> vertices;
+                  std::vector<std::uint32_t> faces;
+
+                  std::uint32_t tracker = 0;
+                  int shifter_i = !shifted ? 0 : -getMaxNeg(true, clidx);
+                  int shifter_j = !shifted ? 0 : -getMaxNeg(false, clidx);
+                  for (int i = 0; i < flatQuadrat.size(); i++) {
+                    for (int j = 0; j < flatQuadrat[i].size(); j++) {
+                      if (!flatQuadrat[i][j]) continue;
+                      vertices.push_back({(shifter_i+i)*arrowPiecesSize, (shifter_j+j)*arrowPiecesSize, 0});
+                      vertices.push_back({(shifter_i+i)*arrowPiecesSize+arrowPiecesSize, (shifter_j+j)*arrowPiecesSize, 0});
+                      vertices.push_back({(shifter_i+i)*arrowPiecesSize+arrowPiecesSize, (shifter_j+j)*arrowPiecesSize+arrowPiecesSize, 0});
+                      vertices.push_back({(shifter_i+i)*arrowPiecesSize, (shifter_j+j)*arrowPiecesSize+arrowPiecesSize, 0});
+
+                      faces.push_back(tracker + 0);
+                      faces.push_back(tracker + 1);
+                      faces.push_back(tracker + 2);
+                      faces.push_back(tracker + 2);
+                      faces.push_back(tracker + 3);
+                      faces.push_back(tracker + 0);
+
+                      tracker+= 4;
+                    }
+                  }
+
+                  writePointsWithFaces(filename, vertices, faces);
+                }};
+                if (debugFracs) {
+                  printFlatQuadrants("output_DEBUG_FlatQ1_notShifted.ply", flatQuadrats[0], false, arrowPiecesSize, 0);
+                  printFlatQuadrants("output_DEBUG_FlatQ1_shifted.ply", flatQuadrats[0], true, arrowPiecesSize, 0);
+                  printFlatQuadrants("output_DEBUG_FlatQ2_notShifted.ply", flatQuadrats[1], false, arrowPiecesSize, 1);
+                  printFlatQuadrants("output_DEBUG_FlatQ2_shifted.ply", flatQuadrats[1], true, arrowPiecesSize, 1);
+                  printFlatQuadrants("output_DEBUG_FlatQ3_notShifted.ply", flatQuadrats[2], false, arrowPiecesSize, 2);
+                  printFlatQuadrants("output_DEBUG_FlatQ3_shifted.ply", flatQuadrats[2], true, arrowPiecesSize, 2);
+
+                }
+
+
+
+
+
+
+
+                //std::cout << "flatQuadrat filled up\n";
+
+                /*for (int i23456 = 0; i23456 < 3; i23456++) {
+                  if (flatQuadrats[i23456].size() == 0) continue;
+                  double occ = computeOccupation(0, flatQuadrats[i23456].size(), 0, flatQuadrats[i23456][0].size(), flatQuadrats[i23456]);
+                  std::cout << "FlatQ_" << i23456 << ":" << flatQuadrats[i23456].size() << "x" << flatQuadrats[i23456][0].size() << ", occ" << occ << "\n";
+                }*/
+
+
+
+                double best_score = -1;
+                int best_a1 = 0;
+                int best_a2 = 0;
+                int best_a3 = 0;
+                bool bestIsInwards = false;
+                for (int a1_i = -max_neg_a1; a1_i < max_pos_a1; a1_i++) {
+                  if (a1_i == 0) continue;
+                  for (int a2_i = -max_neg_a2; a2_i < max_pos_a2; a2_i++) {
+                    if (a2_i == 0) continue;
+                    //std::cout << "Trying_ArrowCombination: " << a1_i << "," << a2_i << "," << "\n";
+                    for (int a3_i = -max_neg_a3; a3_i < max_pos_a3; a3_i++) {
+                      if (a3_i == 0) continue;
+
+                      /*if (a1_i == -5 && a2_i == -30) {
+                        std::cout << "Trying_ArrowCombination: " << a1_i << "," << a2_i << "," << a3_i << "\n";
+                      }*/
+
+
+                      //std::cout << "Trying_ArrowCombination: " << a1_i << "," << a2_i << "," << a3_i << "\n";
+
+                      double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0, flatQuadrats[0]);
+                      double C2_occup = computeOccupationSimplifier(a1_i, a3_i, 1, flatQuadrats[1]);
+                      double C3_occup = computeOccupationSimplifier(a2_i, a3_i, 2, flatQuadrats[2]);
+
+
+                      int minForC1_revOcc = std::min(std::abs(a1_i), std::abs(a2_i));
+                      int minForC2_revOcc = std::min(std::abs(a1_i), std::abs(a3_i));
+                      int minForC3_revOcc = std::min(std::abs(a2_i), std::abs(a3_i));
+
+
+
+
+                      // We may allow one occupation to be almost 0
+                      // So iterate over occupations C1 to C3, if one is zero, calculate borders
+                      // TODO: Ignore this fact for now.
+                      double least_occ;
+                      bool inwards;
+                      if (C1_occup == 0 && C2_occup >= 0.3 && C3_occup >= 0.3) {
+                        double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0]);
+
+
+                        least_occ = std::min(std::min(C1_revOcc, C2_occup), C3_occup);
+                        inwards = false;
+
+                      } else if (C1_occup >= 0.3 && C2_occup == 0 && C3_occup >= 0.3) {
+                        double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, minForC2_revOcc, flatQuadrats[1]);
+
+                        least_occ = std::min(std::min(C1_occup, C2_revOcc), C3_occup);
+                        inwards = false;
+                      } else if (C1_occup >= 0.3 && C2_occup >= 0.3 && C3_occup == 0) {
+                        double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, minForC3_revOcc, flatQuadrats[2]);
+
+
+                        least_occ = std::min(std::min(C1_occup, C2_occup), C3_revOcc);
+                        inwards = false;
+                      } else if (C1_occup >= 0.2 && C2_occup >= 0.2 && C3_occup >= 0.2) {
+                        least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
+
+                        // Make sure the first 20cm are empty
+                        double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[0]);
+                        double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[1]);
+                        double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[2]);
+
+                        if (C1_revOcc > 0 || C2_revOcc > 0 || C3_revOcc > 0) continue;
+
+
+                        inwards = true;
+                      } else continue;
+
+
+                      // TODO: Check if room behind line is empty
+
+                      //double least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
+                      double score = (std::sqrt(least_occ)*2) - 1;  // Sophisticated function that transforms occupation=0 to -1, occupation=1 to 1, and occupation~=0.3 to 0
+                      if (score > best_score) {
+                        best_a1 = a1_i;
+                        best_a2 = a2_i;
+                        best_a3 = a3_i;
+                        best_score = score;
+                        bestIsInwards = inwards;
+
+                        if (debugFracs) {
+                          std::cout << "Found new score: score: " << score << "arrows: " << best_a1 << "," << best_a2 << "," << best_a3 << "\n";
+                          std::cout << "occupations: " << C1_occup << "," << C2_occup << "," << C3_occup << "\n";
+                          std::cout << "occupations_from_to: " << C1_occup << "," << C2_occup << "," << C3_occup << "\n";
+                        }
+                      }
+                    }
+                  }
+                }
+
+                if (best_score <= 0) continue;
+
+                if (best_a1 < 0) edgeLine1 = -edgeLine1;
+                if (best_a2 < 0) edgeLine2 = -edgeLine2;
+                if (best_a3 < 0) edgeLine3 = -edgeLine3;
+
+                // Iterate over all possible arrow-combinations
+
+
+
+
+
+                //std::cout << "Calcs finished" << "\n";
+
+                /*if (C1_suggestedX == 0 || C1_suggestedY == 0 || C2_suggestedX == 0 || C2_suggestedY == 0 || C3_suggestedX == 0 || C3_suggestedY == 0) continue;
+
+
+                bool c1_suggests_a1_neg = (C1_suggestedX / std::abs(C1_suggestedX)) < 0;
+                bool c1_suggests_a2_neg = (C1_suggestedY / std::abs(C1_suggestedY)) < 0;
+                bool c2_suggests_a1_neg = (C2_suggestedX / std::abs(C2_suggestedX)) < 0;
+                bool c2_suggests_a3_neg = (C2_suggestedY / std::abs(C2_suggestedY)) < 0;
+                bool c3_suggests_a2_neg = (C3_suggestedX / std::abs(C3_suggestedX)) < 0;
+                bool c3_suggests_a3_neg = (C3_suggestedY / std::abs(C3_suggestedY)) < 0;
+
+                if (c1_suggests_a1_neg == c2_suggests_a1_neg) {
+                  // Arrow1 is supported by two clusters
+                  if (c1_suggests_a1_neg) { edgeLine1 = -edgeLine1; }
+                } else continue;
+
+                if (c1_suggests_a2_neg == c3_suggests_a2_neg) {
+                  // Arrow1 is supported by two clusters
+                  if (c1_suggests_a2_neg) { edgeLine2 = -edgeLine2; }
+                } else continue;
+
+                if (c2_suggests_a3_neg == c3_suggests_a3_neg) {
+                  // Arrow1 is supported by two clusters
+                  if (c2_suggests_a3_neg) { edgeLine3 = -edgeLine3; }
+                } else continue;
+
+
+                double suggestedA1_len = std::min(std::abs(C1_suggestedX), std::abs(C2_suggestedX));
+                double suggestedA2_len = std::min(std::abs(C1_suggestedY), std::abs(C3_suggestedX));
+                double suggestedA3_len = std::min(std::abs(C2_suggestedY), std::abs(C3_suggestedY));*/
+
+                /*
+
+
                 double maxBoundC1x = std::max(boundC1[0], boundC1[1]);
                 double maxBoundC1y = std::max(boundC1[2], boundC1[3]);
                 double maxBoundC2x = std::max(boundC2[0], boundC2[1]);
                 double maxBoundC2y = std::max(boundC2[2], boundC2[3]);
                 double maxBoundC3x = std::max(boundC3[0], boundC3[1]);
                 double maxBoundC3y = std::max(boundC3[2], boundC3[3]);
+
                 int suggestedQuadrantC1 = calcArrowScore(flatpointsC1,
                                                          boundC1[0],
                                                          boundC1[1],
@@ -853,8 +923,10 @@ namespace RoomCReconstruction {
                   continue;
                 if (suggestionArrow3neg != 0 && suggestionArrow3neg != 2)
                   continue;
+*/
 
-                if (suggestionArrow1neg == 2) {
+
+                /*if (suggestionArrow1neg == 2) {
                   edgeLine1 = -edgeLine1;
                 }
                 if (suggestionArrow2neg == 2) {
@@ -862,9 +934,11 @@ namespace RoomCReconstruction {
                 }
                 if (suggestionArrow3neg == 2) {
                   edgeLine3 = -edgeLine3;
-                }
+                }*/
 
-                std::cout << "Found Arrow: " << i << "," << j << "\n";
+
+                std::cout << "Found Arrow: " << k << "," << i << "," << j << ", idx: " << intersection_triangles.size() << "\n";
+
 
                 /*writePoints("A_DEBUG_" + std::to_string(counter++) + ".ply",
                             simple2Dto3D(flatpointsC1));
@@ -886,12 +960,54 @@ namespace RoomCReconstruction {
                    "\n";*/
 
                 intersection_triangles.push_back(TriangleNode3D(
-                  k, i, j, cornerPoint, {edgeLine1, edgeLine2, edgeLine3}));
+                  k, i, j, cornerPoint, {edgeLine1, edgeLine2, edgeLine3}, {(std::abs(best_a1))*arrowPiecesSize, (std::abs(best_a2))*arrowPiecesSize, (std::abs(best_a3))*arrowPiecesSize}, bestIsInwards));
               }
             }
           }
         }
       }
+
+
+      const auto printArrows{ [](const std::string& filename, double len, bool needLinks, std::vector<TriangleNode3D>& intersection_triangles) -> void {
+        // Debug arrows
+        std::vector<Eigen::Vector3d> arrows;
+        std::vector<std::array<unsigned char, 3>> arrowColors;
+
+        for (int i = 0; i < intersection_triangles.size(); i++) {
+          TriangleNode3D& t = intersection_triangles[i];
+          if (needLinks) {
+            if (t.isInvalid()) continue;
+          }
+          arrows.push_back(t.corner);
+          arrows.push_back(t.corner+ ((len == 0) ? t.suggestedLengths[0]:len)  *t.arrows[0]);
+          arrows.push_back(t.corner);
+          arrows.push_back(t.corner+ ((len == 0) ? t.suggestedLengths[1]:len)  *t.arrows[1]);
+          arrows.push_back(t.corner);
+          arrows.push_back(t.corner+ ((len == 0) ? t.suggestedLengths[2]:len)  *t.arrows[2]);
+
+          // Colors: Center is red if inwards, blue if outwards. Last index is triangle index.
+          //         Arrow-endpoints contain arrow-index at last position
+          arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+          arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(0)});
+          arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+          arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(1)});
+          arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+          arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(2)});
+        }
+        writeEdgesWColors(filename, arrows, arrowColors);
+      }};
+      printArrows("output_clustering_6_arrows.ply", 0, false, intersection_triangles);
+
+
+
+
+
+
+
+
+
+
+
 
 
       std::vector<int> exc;
@@ -948,9 +1064,67 @@ namespace RoomCReconstruction {
       }
       std::cout << "\n";
 
+
+      printArrows("output_clustering_7_arrows_linked.ply", 0, true, intersection_triangles);
+      printArrows("output_clustering_8_arrows_linked_small.ply", 0.1, true, intersection_triangles);
+
+      // Debug Arrows 2
+      /*std::vector<Eigen::Vector3d> arrows2;
+      std::vector<std::array<unsigned char, 3>> arrowColors2;
+
+      for (int i = 0; i < intersection_triangles.size(); i++) {
+        TriangleNode3D& t = intersection_triangles[i];
+        if (t.isInvalid()) continue;
+        arrows2.push_back(t.corner);
+        arrows2.push_back(t.corner+t.suggestedLengths[0]*t.arrows[0]);
+        arrows2.push_back(t.corner);
+        arrows2.push_back(t.corner+t.suggestedLengths[1]*t.arrows[1]);
+        arrows2.push_back(t.corner);
+        arrows2.push_back(t.corner+t.suggestedLengths[2]*t.arrows[2]);
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(0), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(1), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors2.push_back({static_cast<unsigned char>(2), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+      }
+      writeEdgesWColors("output_clustering_7_arrows_linked.ply", arrows2, arrowColors2);*/
+
+
+
+
+/*// Debug Arrows 3
+      std::vector<Eigen::Vector3d> arrows3;
+      std::vector<std::array<unsigned char, 3>> arrowColors3;
+
+      for (int i = 0; i < intersection_triangles.size(); i++) {
+        TriangleNode3D& t = intersection_triangles[i];
+        if (t.isInvalid()) continue;
+        arrows3.push_back(t.corner);
+        arrows3.push_back(t.corner+0.1*t.arrows[0]);
+        arrows3.push_back(t.corner);
+        arrows3.push_back(t.corner+0.1*t.arrows[1]);
+        arrows3.push_back(t.corner);
+        arrows3.push_back(t.corner+0.1*t.arrows[2]);
+        arrowColors3.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors3.push_back({static_cast<unsigned char>(0), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors3.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors3.push_back({static_cast<unsigned char>(1), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors3.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+        arrowColors3.push_back({static_cast<unsigned char>(2), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
+      }
+      writeEdgesWColors("output_clustering_7_arrows_linked_small.ply", arrows3, arrowColors3);
+*/
+
+
+
+
+
+
+
       std::cout << "Printing triangles:\n";
       for (int jj = 0; jj < intersection_triangles.size(); jj++) {
-        if (intersection_triangles[jj].isInvalid()) {continue;}
+        //if (intersection_triangles[jj].isInvalid()) {continue;}
         intersection_triangles[jj].print(intersection_triangles);
       }
       std::cout << "\n";
@@ -1045,50 +1219,6 @@ namespace RoomCReconstruction {
 
 
       writePointsWColors("output_clustering_5_cornerPoints.ply", corners, cornerColors);
-
-      // Debug arrows
-      std::vector<Eigen::Vector3d> arrows;
-      std::vector<std::array<unsigned char, 3>> arrowColors;
-
-      for (int i = 0; i < intersection_triangles.size(); i++) {
-        TriangleNode3D& t = intersection_triangles[i];
-        arrows.push_back(t.corner);
-        arrows.push_back(t.corner+0.1*t.arrows[0]);
-        arrows.push_back(t.corner);
-        arrows.push_back(t.corner+0.1*t.arrows[1]);
-        arrows.push_back(t.corner);
-        arrows.push_back(t.corner+0.1*t.arrows[2]);
-        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-      }
-      writeEdgesWColors("output_clustering_6_arrows.ply", arrows, arrowColors);
-
-
-      // Debug Arrows 2
-      std::vector<Eigen::Vector3d> arrows2;
-      std::vector<std::array<unsigned char, 3>> arrowColors2;
-
-      for (int i = 0; i < intersection_triangles.size(); i++) {
-        TriangleNode3D& t = intersection_triangles[i];
-        if (t.isInvalid()) continue;
-        arrows2.push_back(t.corner);
-        arrows2.push_back(t.corner+0.1*t.arrows[0]);
-        arrows2.push_back(t.corner);
-        arrows2.push_back(t.corner+0.1*t.arrows[1]);
-        arrows2.push_back(t.corner);
-        arrows2.push_back(t.corner+0.1*t.arrows[2]);
-        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors2.push_back({static_cast<unsigned char>(0), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors2.push_back({static_cast<unsigned char>(1), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors2.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-        arrowColors2.push_back({static_cast<unsigned char>(2), static_cast<unsigned char>(i), static_cast<unsigned char>(i)});
-      }
-      writeEdgesWColors("output_clustering_7_arrows_linked.ply", arrows2, arrowColors2);
 
       /*std::cout << clusters.size() << " Clusters with shown keyclusters\n";
       std::fill(colors.begin(), colors.end(), std::array < unsigned char, 3 > {0});
