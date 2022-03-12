@@ -62,10 +62,12 @@ namespace RoomCReconstruction {
             const double planarPointScore = 1 - (local_pcas[i].eigenvalues.z() / local_pcas[i].eigenvalues.y());
 
             // Go to next point if Score is too low
-            if (planarPointScore < 0.95 || stringPointScore > 0.3) continue;
+
           if (planarPointScore > 0.4 || stringPointScore > 0.2) {
             colors[i] = colorGrey;
           }
+            if (planarPointScore < 0.95 || stringPointScore > 0.3) continue;
+
 
             bool found = false;
             for (int j = 0; j != clusters.size(); j++) {
@@ -110,6 +112,47 @@ namespace RoomCReconstruction {
       TangentSpace::IO::write3DPointsWithColors("output_clustering_1_after_removingSmallones.ply", points, colors);
 
 
+      struct MergingReq {
+        double angleFracMerging;
+        double distMerging;
+        double reqPoints;
+      };
+
+      std::vector<MergingReq> mergingQueue = {{64, 0.05, 0},
+                                               {32, 0.05, 0},
+                                              {24, 0.1, 0},
+                                              {16, 0.15, 0},
+                                              {8, 0.1, 0.5},
+                                              {8, 0.2, 0.5},
+                                              {4, 0.2, 0.6}};
+
+
+      bool stillmerging = true;
+      for (MergingReq mergReq : mergingQueue) {
+        std::cout << "distMerging: " << mergReq.distMerging << "\n";
+        std::cout << "angleFracMerging: " << mergReq.angleFracMerging << "\n";
+        stillmerging = true;
+        while (stillmerging) {
+          for (int i = 0; i < clusters.size(); i++) {
+            for (int j = i+1; j < clusters.size(); j++) {
+              Cluster& biggerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[i]:clusters[j];
+              Cluster& smallerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[j]:clusters[i];
+              //std::cout << biggerC.mergedCluster;
+              if (biggerC.mergedCluster || smallerC.mergedCluster) continue;
+              biggerC.tryMergeCluster(smallerC, mergReq.distMerging, mergReq.angleFracMerging, mergReq.reqPoints);
+            }
+          }
+          stillmerging = false;
+          for (auto it = clusters.begin(); it != clusters.end(); it++) {
+            if ((*it).mergedCluster) {
+              stillmerging = true;
+              clusters.erase(it--);
+            }
+          }
+        }
+      }
+
+/*
         // Merge similar clusters
       bool stillmerging = true;
       double distMergingMax = 0.05;
@@ -118,8 +161,8 @@ namespace RoomCReconstruction {
       double distMergingMin = 0.1;
       double angleFracMergingMin = 16;
 
-      for (double angleFracMerging = 32; angleFracMerging >= 16; angleFracMerging -= 16) {
-      for (double distMerging = 0.05; distMerging <= 0.1; distMerging += 0.01) {
+      for (double angleFracMerging = 32; angleFracMerging >= 8; angleFracMerging -= 8) {
+      for (double distMerging = 0.05; distMerging <= 0.25; distMerging += 0.05) {
 
           std::cout << "distMerging: " << distMerging << "\n";
           std::cout << "angleFracMerging: " << angleFracMerging << "\n";
@@ -144,7 +187,7 @@ namespace RoomCReconstruction {
           }
         }
       }
-
+*/
 
 
 
@@ -161,7 +204,7 @@ namespace RoomCReconstruction {
 
 
 
-
+/*
       std::cout << "Now absorbing...\n";
       stillmerging = true;
       while (stillmerging) {
@@ -171,7 +214,7 @@ namespace RoomCReconstruction {
             Cluster& smallerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[j]:clusters[i];
             //std::cout << biggerC.mergedCluster;
             if (biggerC.mergedCluster || smallerC.mergedCluster) continue;
-            biggerC.tryAbsorbCluster(smallerC, 0.15, 0.5);
+            biggerC.tryAbsorbCluster(smallerC, 0.2, 0.6);
           }
         }
         stillmerging = false;
@@ -181,7 +224,7 @@ namespace RoomCReconstruction {
             clusters.erase(it--);
           }
         }
-      }
+      }*/
 
 
 
@@ -440,7 +483,7 @@ namespace RoomCReconstruction {
 
 
 
-                if (k == 0 && i == 6 && j == 21) {
+                if (k == 15 && i == 18 && j == 27) {
                   debugFracs = true;
 
                   std::cout << "Trying Combination: i:" << i << ",j:" << j
@@ -503,8 +546,9 @@ namespace RoomCReconstruction {
                 }};
 
 
-                double arrowPiecesSize = 0.2;
-                double emptyRequirement = 0.2; // required empty space behind line, i.e. the minimum thickness of walls.
+
+                double arrowPiecesSize = 0.1;
+                double emptyRequirement = 0.5; // required empty space behind line, i.e. the minimum thickness of walls.
 
 
 
@@ -525,12 +569,12 @@ namespace RoomCReconstruction {
                 const auto applyDiscrete{ [arrowPiecesSize](double len) -> int {
                   return std::ceil(len / arrowPiecesSize);
                 }};
-                int max_pos_a1 = std::min(applyDiscrete(max_pos_a1_d), 20);
-                int max_neg_a1 = std::min(applyDiscrete(max_neg_a1_d), 20);
-                int max_pos_a2 = std::min(applyDiscrete(max_pos_a2_d), 20);
-                int max_neg_a2 = std::min(applyDiscrete(max_neg_a2_d), 20);
-                int max_pos_a3 = std::min(applyDiscrete(max_pos_a3_d), 20);
-                int max_neg_a3 = std::min(applyDiscrete(max_neg_a3_d), 20);
+                int max_pos_a1 = std::min(applyDiscrete(max_pos_a1_d), 40);
+                int max_neg_a1 = std::min(applyDiscrete(max_neg_a1_d), 40);
+                int max_pos_a2 = std::min(applyDiscrete(max_pos_a2_d), 40);
+                int max_neg_a2 = std::min(applyDiscrete(max_neg_a2_d), 40);
+                int max_pos_a3 = std::min(applyDiscrete(max_pos_a3_d), 40);
+                int max_neg_a3 = std::min(applyDiscrete(max_neg_a3_d), 40);
 
                 /*std::cout << "Dbls: " << max_pos_a1 << "," << max_neg_a1 << "," << max_pos_a2
                           << "," << max_neg_a2 << "," << max_pos_a3 << "," << max_neg_a3 << ",";*/
@@ -563,6 +607,7 @@ namespace RoomCReconstruction {
                     return (clIdx==0) ? max_neg_a2_d:((clIdx==1) ? max_neg_a3_d:max_neg_a3_d);
                   }
                 }};
+
 
 
 
@@ -685,7 +730,7 @@ namespace RoomCReconstruction {
                 }*/
 
 
-
+                double min_inw_occ = 0.15;
                 double best_score = -1;
                 int best_a1 = 0;
                 int best_a2 = 0;
@@ -696,6 +741,21 @@ namespace RoomCReconstruction {
                   for (int a2_i = -max_neg_a2; a2_i < max_pos_a2; a2_i++) {
                     if (a2_i == 0) continue;
                     //std::cout << "Trying_ArrowCombination: " << a1_i << "," << a2_i << "," << "\n";
+
+                    // Fast forward C1_occup
+                    double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0, flatQuadrats[0]);
+                    if (C1_occup > 0 && C1_occup <= min_inw_occ) continue;
+
+                    int minForC1_revOcc = std::min(std::abs(a1_i), std::abs(a2_i));
+                    double C1_revOcc;
+                    if (C1_occup == 0) {
+                      C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0]);
+                      if (C1_revOcc <= 0.3) continue;
+                    }
+
+
+
+
                     for (int a3_i = -max_neg_a3; a3_i < max_pos_a3; a3_i++) {
                       if (a3_i == 0) continue;
 
@@ -706,12 +766,14 @@ namespace RoomCReconstruction {
 
                       //std::cout << "Trying_ArrowCombination: " << a1_i << "," << a2_i << "," << a3_i << "\n";
 
-                      double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0, flatQuadrats[0]);
+
                       double C2_occup = computeOccupationSimplifier(a1_i, a3_i, 1, flatQuadrats[1]);
+                      if (C2_occup > 0 && C2_occup <= min_inw_occ) continue; // Fast forwarding
+
                       double C3_occup = computeOccupationSimplifier(a2_i, a3_i, 2, flatQuadrats[2]);
+                      //if (C3_occup > 0 && C3_occup <= 0.2) continue; // Fast forwarding // useless
 
 
-                      int minForC1_revOcc = std::min(std::abs(a1_i), std::abs(a2_i));
                       int minForC2_revOcc = std::min(std::abs(a1_i), std::abs(a3_i));
                       int minForC3_revOcc = std::min(std::abs(a2_i), std::abs(a3_i));
 
@@ -724,7 +786,7 @@ namespace RoomCReconstruction {
                       double least_occ;
                       bool inwards;
                       if (C1_occup == 0 && C2_occup >= 0.3 && C3_occup >= 0.3) {
-                        double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0]);
+                        //double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0]);
 
 
                         least_occ = std::min(std::min(C1_revOcc, C2_occup), C3_occup);
@@ -733,15 +795,18 @@ namespace RoomCReconstruction {
                       } else if (C1_occup >= 0.3 && C2_occup == 0 && C3_occup >= 0.3) {
                         double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, minForC2_revOcc, flatQuadrats[1]);
 
+                        if (C2_revOcc <= 0.3) continue;
+
                         least_occ = std::min(std::min(C1_occup, C2_revOcc), C3_occup);
                         inwards = false;
                       } else if (C1_occup >= 0.3 && C2_occup >= 0.3 && C3_occup == 0) {
                         double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, minForC3_revOcc, flatQuadrats[2]);
 
+                        if (C3_revOcc <= 0.3) continue;
 
                         least_occ = std::min(std::min(C1_occup, C2_occup), C3_revOcc);
                         inwards = false;
-                      } else if (C1_occup >= 0.2 && C2_occup >= 0.2 && C3_occup >= 0.2) {
+                      } else if (C1_occup >= min_inw_occ && C2_occup >= min_inw_occ && C3_occup >= min_inw_occ) {
                         least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
 
                         // Make sure the first 20cm are empty
@@ -749,7 +814,7 @@ namespace RoomCReconstruction {
                         double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[1]);
                         double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[2]);
 
-                        if (C1_revOcc > 0 || C2_revOcc > 0 || C3_revOcc > 0) continue;
+                        if (C1_revOcc > 0.2 || C2_revOcc > 0.2 || C3_revOcc > 0.2) continue;
 
 
                         inwards = true;
@@ -1671,12 +1736,12 @@ namespace RoomCReconstruction {
       Eigen::Vector3d currentNormal = c1.normal;
       double angle = safe_acos(c2.normal.dot(currentNormal) /
                                (c2.normal.norm() * currentNormal.norm()));
-      double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 32);
+      double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 16);
 
       Eigen::Vector3d currentNormal2 = -c1.normal;
       double angle2 = safe_acos(c2.normal.dot(currentNormal2) /
                                (c2.normal.norm() * currentNormal2.norm()));
-      double gaussian_angle2 = gaussian_1d(angle2, 1.0, 0.0, std::numbers::pi_v<double> / 32);
+      double gaussian_angle2 = gaussian_1d(angle2, 1.0, 0.0, std::numbers::pi_v<double> / 16);
 
       return !(gaussian_angle > 0.6) && !(gaussian_angle2 > 0.6);
     }

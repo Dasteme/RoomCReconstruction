@@ -149,23 +149,46 @@ namespace RoomCReconstruction {
         }
 
 
-        void tryMergeCluster(Cluster& toMergeCluster, double dist, double angle_frac) {
+        void tryMergeCluster(Cluster& toMergeCluster, double dist, double angle_frac, double reqPercent) {
 
-          if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac)) {
-            for (int i = 0; i < toMergeCluster.points.size(); i++) {
-              Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
+          if (reqPercent == 0) {
+            if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac)) {
+              for (int i = 0; i < toMergeCluster.points.size(); i++) {
+                Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
+              }
+              toMergeCluster.mergedCluster = true;
             }
-            toMergeCluster.mergedCluster = true;
+
+            // Negative normals
+            if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, dist, angle_frac)) {
+              for (int i = 0; i < toMergeCluster.points.size(); i++) {
+                Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
+
+              }
+              toMergeCluster.mergedCluster = true;
+            }
+          } else {
+
+            int possibleMergePoints = 0;
+            for (int i = 0; i < toMergeCluster.points.size(); i++) {
+              if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac) ||
+                 checkAdd(toMergeCluster.center, -toMergeCluster.normal, dist, angle_frac)) {
+                possibleMergePoints++;
+              }
+            }
+            if (possibleMergePoints / toMergeCluster.points.size() >= reqPercent) {
+              for (int i = 0; i < toMergeCluster.points.size(); i++) {
+                if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac)) {
+                  Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
+                } else if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, dist, angle_frac)) {
+                  Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
+                }
+              }
+              toMergeCluster.mergedCluster = true;
+            }
           }
 
-          // Negative normals
-          if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, dist, angle_frac)) {
-            for (int i = 0; i < toMergeCluster.points.size(); i++) {
-              Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
 
-            }
-            toMergeCluster.mergedCluster = true;
-          }
         }
 
       void tryAbsorbCluster(Cluster& toAbsorbCluster, double dist, double absorbPercent) {
