@@ -498,7 +498,10 @@ Eigen::Vector3d rotateAround(Eigen::Vector3d toRotate, Eigen::Vector3d aroundRot
 std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d center, Eigen::Vector3d normal, const std::vector<Eigen::Vector3d>& pnts, Eigen::Vector3d a1, Eigen::Vector3d a2);
 
 
-
+void printPointsWRTClusters(const std::string& filename,
+                            const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
+                            const std::vector <Cluster>& clusters,
+                            std::vector <std::array<unsigned char, 3>>& colors);
 
 bool recursiveBestCircle(const std::vector<TriangleNode3D>& iT, const std::vector<int>& exc,std::vector<int>& circle,const int& searchingDir);
 

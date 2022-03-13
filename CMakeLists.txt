@@ -15,8 +15,6 @@ set(HEADER_FILES
         external/ts/pc/parallel.hpp
         external/ts/pc/pc_io.hpp
         external/ts/pc/pc_tools.hpp
-        external/ts/pc/pc_base.hpp
-        external/ts/pc/pc_score.hpp
         src/wallextender.hpp
         src/TriangleNode3D.hpp
         src/rcr_io.hpp

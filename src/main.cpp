@@ -1,9 +1,7 @@
 #include "ts/pc/pc_io.hpp"
-#include "ts/pc/pc_score.hpp"
 #include "wallextender.hpp"
 
 #include "tinyply/tinyply.hpp"
-#include "../external/ts/pc/pc_base.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -20,7 +18,7 @@ int main(int argc, const char* argv[]) {
 
     // Set some variables
     std::chrono::steady_clock::time_point time_measure;
-
+    double PCA_dist = 0.105;
 
 
     // Read point cloud
@@ -86,7 +84,8 @@ int main(int argc, const char* argv[]) {
 
     // Compute PCA
     time_measure = std::chrono::high_resolution_clock::now();
-    constexpr std::size_t PCA_K = 20;
+    std::size_t PCA_K = std::ceil(std::pow(PCA_dist, 2) / std::pow(avg_spacing, 2));
+    std::cout << "using: " << PCA_K << " as PCA_K\n";
     const auto local_pcas = TangentSpace::computeLocalPCAAllPoints(
             search_tree,
             PCA_K,

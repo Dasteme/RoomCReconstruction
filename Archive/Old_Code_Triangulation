@@ -1,0 +1,742 @@
+// Code to quickly decide the Corner-triangle-orientation.
+// Very simple and quick, works only in real corners (not open "corners").
+// Also works only at the edges of the room, so no chimney for example is allowed.
+//
+// It works because it expects a high number of points in exactly one quadrant.
+
+const auto calcValues{[](std::vector<Eigen::Vector2d> fP) -> std::array<int, 4> {
+      std::array<int, 4> res = {0,0,0,0};
+      for (Eigen::Vector2d p1 : fP) {
+        if (p1[0] >= 0) {res[0]++;} else {res[1]++;}
+        if (p1[1] >= 0) {res[2]++;} else {res[3]++;}
+      }
+      return res;
+    }};
+
+
+double suggestionArrow1FromC1 = (double) res1[0] / flatpointsC1.size(); // How many positive numbers out of all points?
+double suggestionArrow2FromC1 = (double) res1[2] / flatpointsC1.size();
+
+double suggestionArrow1FromC2 = (double) res2[0] / flatpointsC2.size();
+double suggestionArrow3FromC2 = (double) res2[2] / flatpointsC2.size();
+
+double suggestionArrow2FromC3 = (double) res3[0] / flatpointsC3.size();
+double suggestionArrow3FromC3 = (double) res3[2] / flatpointsC3.size();
+
+std::array<int, 4> res1 = calcValues(flatpointsC1);
+std::array<int, 4> res2 = calcValues(flatpointsC2);
+std::array<int, 4> res3 = calcValues(flatpointsC3);
+
+
+double suggestionArrow1FromC1 = (double) res1[0] / flatpointsC1.size(); // How many positive numbers out of all points?
+double suggestionArrow2FromC1 = (double) res1[2] / flatpointsC1.size();
+
+double suggestionArrow1FromC2 = (double) res2[0] / flatpointsC2.size();
+double suggestionArrow3FromC2 = (double) res2[2] / flatpointsC2.size();
+
+double suggestionArrow2FromC3 = (double) res3[0] / flatpointsC3.size();
+double suggestionArrow3FromC3 = (double) res3[2] / flatpointsC3.size();
+
+
+double suggestionArrow1 = (suggestionArrow1FromC1 + suggestionArrow1FromC2) / 2;
+double suggestionArrow2 = (suggestionArrow2FromC1 + suggestionArrow2FromC3) / 2;
+double suggestionArrow3 = (suggestionArrow3FromC2 + suggestionArrow3FromC3) / 2;
+
+if (suggestionArrow1 < 0.5) {edgeLine1 = -edgeLine1;}
+if (suggestionArrow2 < 0.5) {edgeLine2 = -edgeLine2;}
+if (suggestionArrow3 < 0.5) {edgeLine3 = -edgeLine3;}
+
+
+
+
+
+
+
+
+
+
+// Some old approaches to get the right directions of the arrows (+ suggested length in "calcArrowScoreNEW")
+//
+//
+//
+//
+//              // Returs the best X- and the best Y-value.
+                // Note that x positive and y positive is quadrant1, x positive and y negative is quadrant 2, and so on.
+                // So we also get the quadrant, but also a number which tells how long the arrow should be.
+                // This can be used to order triangle-followers. The ones which have to "create" the least wall where is none are selected first.
+                // However, this method was so slow that it was not developed further.
+                // Might still contain some bugs, it did never run through (Because of Ctrl+C all the times, was too slow).
+
+                const auto calcArrowScoreNEW{ [](const std::vector<Eigen::Vector2d>& fP,
+                                                 const std::array<double, 4>& boundaries,  // Note: Everything is positive, order: X, negX, Y, negY
+                                                 int& best_X,
+                                                 int& best_Y
+                                                ) -> void {
+                  //std::cout << "calcArrowScoreNEW\n";
+                  double arrowPiecesSize = 0.2;
+                  double requiredEmptyBorder = 0.2;
+                  int reqEmptyBP = std::ceil(requiredEmptyBorder / arrowPiecesSize);
+
+//                  std::array<int, 4> piecesCount = {
+//                    std::to_integer<>() std::ceil((boundaries[0]) / arrowPiecesSize),
+//                    std::ceil((boundaries[1]) / arrowPiecesSize),
+//                    std::ceil((boundaries[2]) / arrowPiecesSize),
+//                    std::ceil((boundaries[3]) / arrowPiecesSize)
+//                  };
+
+                  int nmbPosXPieces = std::ceil((boundaries[0]) / arrowPiecesSize);
+                  int nmbNegXPieces = std::ceil((boundaries[1]) / arrowPiecesSize);
+                  int nmbPosYPieces = std::ceil((boundaries[2]) / arrowPiecesSize);
+                  int nmbNegYPieces = std::ceil((boundaries[3]) / arrowPiecesSize);
+
+                  if (debugFracs) {std::cout << "Nmbrs: " << nmbPosXPieces << ", " << nmbNegXPieces << ", "
+                            << nmbPosYPieces << ", " << nmbNegYPieces << "\n";}
+
+                  std::vector<int> xPositivePieces(nmbPosXPieces, 0);
+                  std::vector<int> xNegativePieces(nmbNegXPieces, 0);
+                  std::vector<int> yPositivePieces(nmbPosYPieces, 0);
+                  std::vector<int> yNegativePieces(nmbNegYPieces, 0);
+
+                  std::array<std::vector<std::vector<bool>>, 4> flatQuadrats = {
+                    std::vector<std::vector<bool>>(nmbPosXPieces, std::vector<bool>(nmbPosYPieces, false)),
+                    std::vector<std::vector<bool>>(nmbPosXPieces, std::vector<bool>(nmbNegYPieces, false)),
+                    std::vector<std::vector<bool>>(nmbNegXPieces, std::vector<bool>(nmbPosYPieces, false)),
+                    std::vector<std::vector<bool>>(nmbNegXPieces, std::vector<bool>(nmbNegYPieces, false))
+                  };
+
+
+                  for (Eigen::Vector2d p1 : fP) {
+                    if (p1[0] >= 0 && p1[1] >= 0) { // x,y positive
+                      flatQuadrats[0][(int)std::floor(p1[0] / arrowPiecesSize)]
+                      [(int)std::floor(p1[1] / arrowPiecesSize)] = true;
+                    } else if (p1[0] >= 0 && p1[1] < 0) { // x positive, y negative
+                      flatQuadrats[1][(int)std::floor(p1[0] / arrowPiecesSize)]
+                      [(int)std::floor(-p1[1] / arrowPiecesSize)] = true;
+                    } else if (p1[0] < 0 && p1[1] >= 0) { // x negative, y positive
+                      flatQuadrats[2][(int)std::floor(-p1[0] / arrowPiecesSize)]
+                      [(int)std::floor(p1[1] / arrowPiecesSize)] = true;
+                    } else if (p1[0] < 0 && p1[1] < 0) { // x,y negative
+                      flatQuadrats[3][(int)std::floor(-p1[0] / arrowPiecesSize)]
+                      [(int)std::floor(-p1[1] / arrowPiecesSize)] = true;
+                    }
+                  }
+
+                  //std::cout << "Flat quadrats set up!\n";
+
+                  struct TryingRectangle {
+                    int quadrant;
+                    int i;
+                    int j;
+                    double score;  // -1: certainly not, 0: not sure, 1 certain
+                  };
+                  std::array<std::vector<TryingRectangle>, 4> tryings = {
+                    std::vector<TryingRectangle>(),
+                    std::vector<TryingRectangle>(),
+                    std::vector<TryingRectangle>(),
+                    std::vector<TryingRectangle>()
+                  };
+
+
+                  for (int i = 1; i < nmbPosXPieces; i++) {
+                    for (int j = 1; j < nmbPosYPieces; j++) {
+                      tryings[0].push_back({0, i, j, -2});
+                    }
+                  }
+                  for (int i = 1; i < nmbPosXPieces; i++) {
+                    for (int j = 1; j < nmbNegYPieces; j++) {
+                      tryings[1].push_back({1, i, j, -2});
+                    }
+                  }
+                  for (int i = 1; i < nmbNegXPieces; i++) {
+                    for (int j = 1; j < nmbPosYPieces; j++) {
+                      tryings[2].push_back({2, i, j, -2});
+                    }
+                  }
+                  for (int i = 1; i < nmbNegXPieces; i++) {
+                    for (int j = 1; j < nmbNegYPieces; j++) {
+                      tryings[3].push_back({3, i, j, -2});
+                    }
+                  }
+
+                  //std::cout << "Tryings set up!\n";
+
+
+                  const auto computeScore{ [reqEmptyBP](TryingRectangle& tr,
+                                              const std::array<std::vector<std::vector<bool>>, 4>& flatQuadrats
+
+                  ) -> void {
+
+                    const auto computeOccupation{ [](int max_i, int max_j, std::vector<std::vector<bool>> flatQuadrat) -> double {
+                      //std::cout << "Computing occ: " << max_i << "," << max_j << "\n";
+                      int summed = 0;
+                      for (int i = 0; i < max_i; i++) {
+                        for (int j = 0; j < max_j; j++) {
+                          if (i < flatQuadrat.size() && j < flatQuadrat[i].size()) {  // If i or j is out of boundaries, assume there is an empty flatQ
+                            if (flatQuadrat[i][j]) summed++;
+                          }
+
+                        }
+                      }
+                      return (double) summed / (max_i * max_j);
+                    }};
+
+                    //std::cout << "Computing occ for me\n";
+                    double occupation = computeOccupation(tr.i, tr.j, flatQuadrats[tr.quadrant]);
+
+                    //std::cout << "Computing occ for others\n";
+                    // Check the compatibility with other clusters
+                    double occupation1, occupation2, occupation3;
+                    if (tr.quadrant == 0) {
+                      occupation1 = computeOccupation(tr.i, reqEmptyBP, flatQuadrats[2]);
+                      occupation2 = computeOccupation(reqEmptyBP, tr.j, flatQuadrats[1]);
+                      occupation3 = computeOccupation(reqEmptyBP, reqEmptyBP, flatQuadrats[3]);
+                    } else if (tr.quadrant == 1) {
+                      occupation1 = computeOccupation(tr.i, reqEmptyBP, flatQuadrats[3]);
+                      occupation2 = computeOccupation(reqEmptyBP, tr.j, flatQuadrats[0]);
+                      occupation3 = computeOccupation(reqEmptyBP, reqEmptyBP, flatQuadrats[2]);
+                    } else if (tr.quadrant == 2) {
+                      occupation1 = computeOccupation(tr.i, reqEmptyBP, flatQuadrats[0]);
+                      occupation2 = computeOccupation(reqEmptyBP, tr.j, flatQuadrats[3]);
+                      occupation3 = computeOccupation(reqEmptyBP, reqEmptyBP, flatQuadrats[1]);
+                    } else if (tr.quadrant == 3) {
+                      occupation1 = computeOccupation(tr.i, reqEmptyBP, flatQuadrats[1]);
+                      occupation2 = computeOccupation(reqEmptyBP, tr.j, flatQuadrats[2]);
+                      occupation3 = computeOccupation(reqEmptyBP, reqEmptyBP, flatQuadrats[0]);
+                    }
+
+                    //std::cout << "Analyzing occs\n";
+                    //std::cout << occupation << "," << occupation1 << "," <<occupation2 << "," <<occupation3 << "\n";
+                    if (occupation > 0.3) {
+                      if (occupation1 < 0.1 && occupation2 < 0.1 && occupation3 < 0.1) {
+                        //std::cout << "Found case 1\n";
+                        tr.score = (std::sqrt(occupation)*2) - 1;  // Sophisticated function that transforms occupation=0 to -1, occupation=1 to 1, and occupation~=0.3 to 0
+                      }
+                    } else if (occupation < 0.1) {  // Todo: caluculate occupations a little bit different than in the case of occupation > 0.3. use wider ranges than 2. But how big?
+                      //std::cout << "Found case 2.1\n";
+                      if (occupation1 > 0.3 && occupation2 > 0.3 && occupation3 > 0.3) {
+                        //std::cout << "Found case 2\n";
+                        tr.score = (std::sqrt( ((occupation1 + occupation2 + occupation3) / 3)  )*2) - 1;
+                      } else {
+                        //std::cout << "Found case 2.2\n";
+                      }
+                    } else {
+                      tr.score = -1;
+                    }
+                  }};
+
+                  // Find best x-y-arrow combination
+                  int bestScore = -2;
+                  for (int k = 0; k < 4; k++) {
+                    for (int l = 0; l < tryings[k].size(); l++) {
+                      //std::cout << "Compute Score for: " << tryings[k][l].i << "," << tryings[k][l].j << ", q:" << tryings[k][l].quadrant << "\n";
+                      computeScore(tryings[k][l], flatQuadrats);
+                      if (tryings[k][l].score > bestScore) {
+                        bestScore = tryings[k][l].score;
+                        best_X = (k == 0 || k == 2) ? tryings[k][l].i : -tryings[k][l].i;
+                        best_Y = (k == 0 || k == 1) ? tryings[k][l].j : -tryings[k][l].j;
+                      }
+                    }
+                  }
+                }
+                  };
+
+                // Outer code for calcArrowScoreNEW
+                int C1_suggestedX = 0;
+                int C1_suggestedY = 0;
+                int C2_suggestedX = 0;
+                int C2_suggestedY = 0;
+                int C3_suggestedX = 0;
+                int C3_suggestedY = 0;
+
+                calcArrowScoreNEW(flatpointsC1, boundC1, C1_suggestedX, C1_suggestedY);
+                calcArrowScoreNEW(flatpointsC2, boundC2, C2_suggestedX, C2_suggestedY);
+                calcArrowScoreNEW(flatpointsC3, boundC3, C3_suggestedX, C3_suggestedY);
+
+
+                if (C1_suggestedX == 0 || C1_suggestedY == 0 || C2_suggestedX == 0 || C2_suggestedY == 0 || C3_suggestedX == 0 || C3_suggestedY == 0) continue;
+
+                bool c1_suggests_a1_neg = (C1_suggestedX / std::abs(C1_suggestedX)) < 0;
+                bool c1_suggests_a2_neg = (C1_suggestedY / std::abs(C1_suggestedY)) < 0;
+                bool c2_suggests_a1_neg = (C2_suggestedX / std::abs(C2_suggestedX)) < 0;
+                bool c2_suggests_a3_neg = (C2_suggestedY / std::abs(C2_suggestedY)) < 0;
+                bool c3_suggests_a2_neg = (C3_suggestedX / std::abs(C3_suggestedX)) < 0;
+                bool c3_suggests_a3_neg = (C3_suggestedY / std::abs(C3_suggestedY)) < 0;
+
+                if (c1_suggests_a1_neg == c2_suggests_a1_neg) {
+                  // Arrow1 is supported by two clusters
+                  if (c1_suggests_a1_neg) { edgeLine1 = -edgeLine1; }
+                } else continue;
+
+                if (c1_suggests_a2_neg == c3_suggests_a2_neg) {
+                  // Arrow1 is supported by two clusters
+                  if (c1_suggests_a2_neg) { edgeLine2 = -edgeLine2; }
+                } else continue;
+
+                if (c2_suggests_a3_neg == c3_suggests_a3_neg) {
+                  // Arrow1 is supported by two clusters
+                  if (c2_suggests_a3_neg) { edgeLine3 = -edgeLine3; }
+                } else continue;
+
+
+                double suggestedA1_len = std::min(std::abs(C1_suggestedX), std::abs(C2_suggestedX));
+                double suggestedA2_len = std::min(std::abs(C1_suggestedY), std::abs(C3_suggestedX));
+                double suggestedA3_len = std::min(std::abs(C2_suggestedY), std::abs(C3_suggestedY));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                // Returns the suspected quadrant.
+                // It calculates it by going rather "circular" around the center.
+                // As soon as we find one, quit.
+                // A quadrant is either one that is the only one with points (and enough occupation)
+                // or the only one with no points (and the others must have enough occupation)
+                //
+                const auto calcArrowScore{ [](std::vector<Eigen::Vector2d> fP,
+                                              double xPosAxisLen,
+                                              double xNegAxisLen,
+                                              double yPosAxisLen,
+                                              double yNegAxisLen,
+                                              double maxAbsX,
+                                              double maxAbsY) -> int {
+                  std::array<double, 2> res = { 0, 0 };
+
+                  double arrowPiecesSize = 0.2;
+
+                  int maxAbsXint = std::ceil(maxAbsX / arrowPiecesSize);
+                  int maxAbsYint = std::ceil(maxAbsY / arrowPiecesSize);
+
+                  int nmbPosXPieces = std::ceil((xPosAxisLen) / arrowPiecesSize);
+                  int nmbNegXPieces = std::ceil((xNegAxisLen) / arrowPiecesSize);
+                  int nmbPosYPieces = std::ceil((yPosAxisLen) / arrowPiecesSize);
+                  int nmbNegYPieces = std::ceil((yNegAxisLen) / arrowPiecesSize);
+
+                  /*std::cout << "Nmbrs: " << nmbPosXPieces << ", " << nmbNegXPieces << ", "
+                            << nmbPosYPieces << ", " << nmbNegYPieces << "\n";*/
+
+                  std::vector<int> xPositivePieces(nmbPosXPieces, 0);
+                  std::vector<int> xNegativePieces(nmbNegXPieces, 0);
+                  std::vector<int> yPositivePieces(nmbPosYPieces, 0);
+                  std::vector<int> yNegativePieces(nmbNegYPieces, 0);
+
+                  std::vector<std::vector<bool>> flatQuadrats1(
+                    nmbPosXPieces, std::vector<bool>(nmbPosYPieces, false));
+                  std::vector<std::vector<bool>> flatQuadrats2(
+                    nmbPosXPieces, std::vector<bool>(nmbNegYPieces, false));
+                  std::vector<std::vector<bool>> flatQuadrats3(
+                    nmbNegXPieces, std::vector<bool>(nmbPosYPieces, false));
+                  std::vector<std::vector<bool>> flatQuadrats4(
+                    nmbNegXPieces, std::vector<bool>(nmbNegYPieces, false));
+
+                  for (Eigen::Vector2d p1 : fP) {
+                    if (p1[0] >= 0 && p1[1] >= 0) { // x,y positive
+                      flatQuadrats1[(int)std::floor(p1[0] / arrowPiecesSize)]
+                                   [(int)std::floor(p1[1] / arrowPiecesSize)] = true;
+                    } else if (p1[0] >= 0 && p1[1] < 0) { // x positive, y negative
+                      flatQuadrats2[(int)std::floor(p1[0] / arrowPiecesSize)]
+                                   [(int)std::floor(-p1[1] / arrowPiecesSize)] = true;
+                    } else if (p1[0] < 0 && p1[1] >= 0) { // x negative, y positive
+                      flatQuadrats3[(int)std::floor(-p1[0] / arrowPiecesSize)]
+                                   [(int)std::floor(p1[1] / arrowPiecesSize)] = true;
+                    } else if (p1[0] < 0 && p1[1] < 0) { // x,y negative
+                      flatQuadrats4[(int)std::floor(-p1[0] / arrowPiecesSize)]
+                                   [(int)std::floor(-p1[1] / arrowPiecesSize)] = true;
+                    }
+                  }
+
+                  // Grow from 0,0 in a rather circular way
+
+                  int summed1 = 0;
+                  int summed2 = 0;
+                  int summed3 = 0;
+                  int summed4 = 0;
+
+                  int distance = 0;
+
+                  int curX = 0;
+                  int curY = 0;
+                  int curNX = 0;
+                  int curNY = 0;
+
+                  const double minimumRequiredOccupation = 0.2;
+
+                  bool running = true;
+                  int maxDist = std::max(std::max(nmbPosXPieces, nmbPosYPieces),
+                                         std::max(nmbNegXPieces, nmbNegYPieces));
+
+                  // When we already added sth. and then don't add for 3 times in a row, quit iterating over this direction
+                  // Idea: If a cluster contains multiple separate parts across the room, sonly stick to the one closest to the corner.
+                  int notAddedX = -1;
+                  int notAddedY = -1;
+                  int notAddedNX = -1;
+                  int notAddedNY = -1;
+
+                  if (debugFracs) {
+                    std::cout << "Going to iterate over distances: "
+                              << (nmbPosXPieces - 1) << "_" << maxAbsXint << ","
+                              << (nmbPosYPieces - 1) << "_" << maxAbsYint << ","
+                              << (nmbNegXPieces - 1) << "_" << maxAbsXint << ","
+                              << (nmbNegYPieces - 1) << "_" << maxAbsYint << "\n";
+                  }
+
+                  // We don't want to make an assumption just out of the first 0.1m. So start at 2 (0.2m)
+                  for (int dst = 2; dst < maxDist; dst++) {
+                    bool addedOneX = false;
+                    bool addedOneY = false;
+                    bool addedOneNX = false;
+                    bool addedOneNY = false;
+
+                    if (dst < nmbPosXPieces - 1 && dst < maxAbsXint && notAddedX != 0) {
+                      if (debugFracs) std::cout << "Increasing X from: " << curX << " to " << dst << "\n";
+                      curX = dst;
+
+                      for (int t = 0; t < curY; t++) {
+                        if (flatQuadrats1[curX][t]) {
+                          summed1++;
+                          addedOneX = true;
+                          if (notAddedY < 0) addedOneY = true;
+                        }
+                      }
+                      for (int t = 0; t < curNY; t++) {
+                        if (flatQuadrats2[curX][t]) {
+                          summed2++;
+                          addedOneX = true;
+                          if (notAddedNY < 0) addedOneNY = true;
+                        }
+                      }
+
+                    }
+
+                    if (dst < nmbPosYPieces - 1 && dst < maxAbsYint && notAddedY != 0) {
+                      if (debugFracs) std::cout << "Increasing Y from: " << curY << " to " << dst << "\n";
+                      curY = dst;
+                      for (int t = 0; t < curX; t++) {
+                        if (flatQuadrats1[t][curY]) {
+                          summed1++;
+                          addedOneY = true;
+                          if (notAddedX < 0) addedOneX = true;
+                        }
+                      }
+                      for (int t = 0; t < curNX; t++) {
+                        if (flatQuadrats3[t][curY]) {
+                          summed3++;
+                          addedOneY = true;
+                          if (notAddedNX < 0) addedOneNX = true;
+                        }
+                      }
+                    }
+                    if (dst < nmbNegXPieces - 1 && dst < maxAbsXint && notAddedNX != 0) {
+                      if (debugFracs) std::cout << "Increasing NX from: " << curNX << " to " << dst << "\n";
+                      curNX = dst;
+                      for (int t = 0; t < curY; t++) {
+                        if (flatQuadrats3[curNX][t]) {
+                          summed3++;
+                          addedOneNX = true;
+                          if (notAddedY < 0) addedOneY = true;
+                        }
+                      }
+                      for (int t = 0; t < curNY; t++) {
+                        if (flatQuadrats4[curNX][t]) {
+                          summed4++;
+                          addedOneNX = true;
+                          if (notAddedNY < 0) addedOneNY = true;
+                        }
+                      }
+                    }
+                    if (dst < nmbNegYPieces - 1 && dst < maxAbsYint && notAddedNY != 0) {
+                      if (debugFracs) std::cout << "Increasing NY from: " << curNY << " to " << dst << "\n";
+                      curNY = dst;
+                      for (int t = 0; t < curX; t++) {
+                        if (flatQuadrats2[t][curNY]) {
+                          summed2++;
+                          addedOneNY = true;
+                          if (notAddedX < 0) addedOneX = true;
+                        }
+                      }
+                      for (int t = 0; t < curNX; t++) {
+                        if (flatQuadrats4[t][curNY]){
+                          summed4++;
+                          addedOneNY = true;
+                          if (notAddedNX < 0) addedOneNX = true;
+                        }
+                      }
+                    }
+
+                    if (addedOneX) {notAddedX = 2;} else if (notAddedX!=0) {notAddedX--;}
+                    if (addedOneY) {notAddedY = 2;} else if (notAddedY!=0) {notAddedY--;}
+                    if (addedOneNX) {notAddedNX = 2;} else if (notAddedNX!=0) {notAddedNX--;}
+                    if (addedOneNY) {notAddedNY = 2;} else if (notAddedNY!=0) {notAddedNY--;}
+
+                    double quad1Frac = (curX * curY) == 0 ? 0 : (double)summed1 / (curX * curY);
+                    double quad2Frac = (curX * curNY) == 0 ? 0 : (double)summed2 / (curX * curNY);
+                    double quad3Frac = (curNX * curY) == 0 ? 0 : (double)summed3 / (curNX * curY);
+                    double quad4Frac = (curNX * curNY) == 0 ? 0 : (double)summed4 / (curNX * curNY);
+
+                    if (debugFracs){
+                      std::cout << "Dist:" << dst << ", Fracs: " << quad1Frac << ", " << quad2Frac
+                                << ", " << quad3Frac << ", " << quad4Frac << "\n";
+                      std::cout << "NotAddeds: " << notAddedX << "," << notAddedY << "," << notAddedNX << "," << notAddedNY;
+                    }
+
+
+                    double reqOccup =
+                      gaussian_1d((double)dst / maxDist, 1.0 - minimumRequiredOccupation, 0.0, 0.05);
+                    reqOccup += minimumRequiredOccupation;
+                    if (debugFracs) {std::cout << "Required Occupaction: " << reqOccup << ", dst: " << dst << ", maxDst: " << maxDist << "\n";}
+
+                    if (quad1Frac > reqOccup && quad2Frac < 0.2 && quad3Frac < 0.2 &&
+                        quad4Frac < 0.2)
+                      return 1;
+                    if (quad1Frac < 0.2 && quad2Frac > reqOccup && quad3Frac < 0.2 &&
+                        quad4Frac < 0.2)
+                      return 2;
+                    if (quad1Frac < 0.2 && quad2Frac < 0.2 && quad3Frac > reqOccup &&
+                        quad4Frac < 0.2)
+                      return 3;
+                    if (quad1Frac < 0.2 && quad2Frac < 0.2 && quad3Frac < 0.2 &&
+                        quad4Frac > reqOccup)
+                      return 4;
+
+                    if (quad1Frac < 0.2 && quad2Frac > reqOccup && quad3Frac > reqOccup &&
+                        quad4Frac > reqOccup)
+                      return 1;
+                    if (quad1Frac > reqOccup && quad2Frac < 0.2 && quad3Frac > reqOccup &&
+                        quad4Frac > reqOccup)
+                      return 2;
+                    if (quad1Frac > reqOccup && quad2Frac > reqOccup && quad3Frac < 0.2 &&
+                        quad4Frac > reqOccup)
+                      return 3;
+                    if (quad1Frac > reqOccup && quad2Frac > reqOccup && quad3Frac > reqOccup &&
+                        quad4Frac < 0.2)
+                      return 4;
+                  }
+
+                  return 0;
+                } };
+
+
+                // Outer code for calcArrowScore
+
+                double maxBoundC1x = std::max(boundC1[0], boundC1[1]);
+                double maxBoundC1y = std::max(boundC1[2], boundC1[3]);
+                double maxBoundC2x = std::max(boundC2[0], boundC2[1]);
+                double maxBoundC2y = std::max(boundC2[2], boundC2[3]);
+                double maxBoundC3x = std::max(boundC3[0], boundC3[1]);
+                double maxBoundC3y = std::max(boundC3[2], boundC3[3]);
+
+                int suggestedQuadrantC1 = calcArrowScore(flatpointsC1,
+                                                         boundC1[0],
+                                                         boundC1[1],
+                                                         boundC1[2],
+                                                         boundC1[3],
+                                                         maxBoundC2x,
+                                                         maxBoundC3x);
+                //std::cout << "QuadrantC1: " << suggestedQuadrantC1 << "\n";
+                int suggestedQuadrantC2 = calcArrowScore(flatpointsC2,
+                                                         boundC2[0],
+                                                         boundC2[1],
+                                                         boundC2[2],
+                                                         boundC2[3],
+                                                         maxBoundC1x,
+                                                         maxBoundC3y);
+                //std::cout << "QuadrantC2: " << suggestedQuadrantC2 << "\n";
+                int suggestedQuadrantC3 = calcArrowScore(flatpointsC3,
+                                                         boundC3[0],
+                                                         boundC3[1],
+                                                         boundC3[2],
+                                                         boundC3[3],
+                                                         maxBoundC1y,
+                                                         maxBoundC2y);
+                //std::cout << "QuadrantC3: " << suggestedQuadrantC3 << "\n";
+                if (suggestedQuadrantC1 == 0 || suggestedQuadrantC2 == 0 ||
+                    suggestedQuadrantC3 == 0)
+                  continue;
+
+                int suggestionArrow1pos = 0;
+                int suggestionArrow1neg = 0;
+                int suggestionArrow2pos = 0;
+                int suggestionArrow2neg = 0;
+                int suggestionArrow3pos = 0;
+                int suggestionArrow3neg = 0;
+
+                // a1: posX, a2: posY, a3: negX, a4: negY
+                const auto quadrantToArrows{
+                  [](int quadrant, int& a1, int& a2, int& a3, int& a4) -> void {
+                    switch (quadrant) {
+                      case 1: {a1++;a2++;return;}
+                      case 2: {a1++;a4++;break;}
+                      case 3: {a3++;a2++;break;}
+                      case 4: {a3++;a4++;break;}
+                    }
+                  }
+                };
+
+                quadrantToArrows(suggestedQuadrantC1,
+                                 suggestionArrow1pos,
+                                 suggestionArrow2pos,
+                                 suggestionArrow1neg,
+                                 suggestionArrow2neg);
+                quadrantToArrows(suggestedQuadrantC2,
+                                 suggestionArrow1pos,
+                                 suggestionArrow3pos,
+                                 suggestionArrow1neg,
+                                 suggestionArrow3neg);
+                quadrantToArrows(suggestedQuadrantC3,
+                                 suggestionArrow2pos,
+                                 suggestionArrow3pos,
+                                 suggestionArrow2neg,
+                                 suggestionArrow3neg);
+
+                // We want unique arrows. One Cluster suggesting another arrow than the other results in the whole point beeing ignored
+                if (suggestionArrow1pos != 0 && suggestionArrow1pos != 2)
+                  continue;
+                if (suggestionArrow1neg != 0 && suggestionArrow1neg != 2)
+                  continue;
+                if (suggestionArrow2pos != 0 && suggestionArrow2pos != 2)
+                  continue;
+                if (suggestionArrow2neg != 0 && suggestionArrow2neg != 2)
+                  continue;
+                if (suggestionArrow3pos != 0 && suggestionArrow3pos != 2)
+                  continue;
+                if (suggestionArrow3neg != 0 && suggestionArrow3neg != 2)
+                  continue;
+
+
+                /*if (suggestionArrow1neg == 2) {
+                  edgeLine1 = -edgeLine1;
+                }
+                if (suggestionArrow2neg == 2) {
+                  edgeLine2 = -edgeLine2;
+                }
+                if (suggestionArrow3neg == 2) {
+                  edgeLine3 = -edgeLine3;
+                }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                // Idea: Calculate a score for each quadrant using gaussian.
+                //       Iterate over points and sum up gaussian distance to center
+                //       Why gaussian? Close points should have a higher impact than point further away
+                //
+                const auto calculateQuadrantScores{[](std::vector<Eigen::Vector2d> fP) -> int {
+
+
+                  std::array<double, 4> quadrantScores25{ 0,0,0,0 };
+                  std::array<double, 4> quadrantScores50{ 0,0,0,0 };
+                  std::array<double, 4> quadrantScores100{ 0,0,0,0 };
+                  std::array<double, 4> quadrantScores200{ 0,0,0,0 };
+                  std::array<double, 4> quadrantScores500{ 0,0,0,0 };
+                  for (Eigen::Vector2d p1 : fP) {
+                    int quadrant = -1;
+                    if (p1[0] >= 0 && p1[1] >= 0) {           // x,y positive
+                      quadrant = 0;
+                    } else if (p1[0] >= 0 && p1[1] < 0) {     // x positive, y negative
+                      quadrant = 1;
+                    } else if (p1[0] < 0 && p1[1] >= 0) {     // x negative, y positive
+                      quadrant = 2;
+                    } else if (p1[0] < 0 && p1[1] < 0) {      // x,y negative
+                      quadrant = 3;
+                    }
+                    double distToCenter = std::sqrt(p1[0]*p1[0] + p1[1]*p1[1]);
+                    if (distToCenter <= 0.25) quadrantScores25[quadrant] +=
+                gaussian_1d(distToCenter, 1.0, 0, 0.25); if (distToCenter <= 0.5)
+                quadrantScores50[quadrant] += gaussian_1d(distToCenter, 1.0, 0, 0.5); if
+                (distToCenter <= 1) quadrantScores100[quadrant] += gaussian_1d(distToCenter, 1.0,
+                0, 1.00); if (distToCenter <= 2) quadrantScores200[quadrant] +=
+                gaussian_1d(distToCenter, 1.0, 0, 2.00); if (distToCenter <= 5)
+                quadrantScores500[quadrant] += gaussian_1d(distToCenter, 1.0, 0, 5.00);
+                  }
+                  for (int i = 0; i < 4; i++) {quadrantScores25[i] = quadrantScores25[i] /
+                fP.size();} for (int i = 0; i < 4; i++) {quadrantScores50[i] = quadrantScores50[i] /
+                fP.size();} for (int i = 0; i < 4; i++) {quadrantScores100[i] = quadrantScores100[i]
+                / fP.size();} for (int i = 0; i < 4; i++) {quadrantScores200[i] =
+                quadrantScores200[i] / fP.size();} for (int i = 0; i < 4; i++) {quadrantScores500[i]
+                = quadrantScores500[i] / fP.size();}
+
+                  const auto tenTimesHigherThanOthers{[](std::array<double, 4> quadrantScore) -> int
+                { for (int i = 0; i < 4; i++) { bool found = true; for (int j = 0; j < 4; j++) {
+                          if(j == i) continue;
+                          if (quadrantScore[i] < quadrantScore[j]*10) {found = false; break; }
+                        }
+                        if (found) {
+                          return i;
+                        }
+                      }
+                      return -1;
+                    }};
+                  const auto tenTimesSmallerThanOthers{[](std::array<double, 4> quadrantScore) ->
+                int { for (int i = 0; i < 4; i++) { bool found = true; for (int j = 0; j < 4; j++) {
+                        if(j == i) continue;
+                        if (quadrantScore[i]*10 < quadrantScore[j]) {found = false; break; }
+                      }
+                      if (found) {
+                        return i;
+                      }
+                    }
+                    return -1;
+                  }};
+                  int mainQuadrant25 = tenTimesHigherThanOthers(quadrantScores25);
+                  int mainQuadrant50 = tenTimesHigherThanOthers(quadrantScores50);
+                  int mainQuadrant100 = tenTimesHigherThanOthers(quadrantScores100);
+                  int mainQuadrant200 = tenTimesHigherThanOthers(quadrantScores200);
+                  int mainQuadrant500 = tenTimesHigherThanOthers(quadrantScores500);
+                  if (mainQuadrant25 != -1) {return mainQuadrant25;}
+                  if (mainQuadrant50 != -1) {return mainQuadrant50;}
+                  if (mainQuadrant100 != -1) {return mainQuadrant100;}
+                  if (mainQuadrant200 != -1) {return mainQuadrant200;}
+                  if (mainQuadrant500 != -1) {return mainQuadrant500;}
+                  return -1;
+                }};
+
+
+
