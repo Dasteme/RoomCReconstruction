@@ -18,7 +18,7 @@ int main(int argc, const char* argv[]) {
 
     // Set some variables
     std::chrono::steady_clock::time_point time_measure;
-    double PCA_dist = 0.105;
+    double PCA_dist = 0.2;
 
 
     // Read point cloud
@@ -89,7 +89,7 @@ int main(int argc, const char* argv[]) {
     const auto local_pcas = TangentSpace::computeLocalPCAAllPoints(
             search_tree,
             PCA_K,
-            3.0 * avg_spacing_per_point.cwiseMin(avg_spacing + 2.0 * avg_spacing_sdev));
+            3.0 * avg_spacing_per_point.cwiseMin(avg_spacing + 2.0 * avg_spacing_sdev), PCA_dist);
     std::cout << "Local pca decomposition computation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl << std::endl;
 
 

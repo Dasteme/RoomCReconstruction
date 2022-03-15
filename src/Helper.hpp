@@ -33,5 +33,7 @@ namespace RoomCReconstruction {
 
   int getCircularIndex(int arraySize, int index);
 double formatDouble(double d, int digits);
+
+std::string formatInteger(unsigned int i, unsigned int preceingZeros);
 }
 

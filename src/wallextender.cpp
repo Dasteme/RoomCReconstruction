@@ -13,6 +13,14 @@
 
 namespace RoomCReconstruction {
 
+    double req_angle = 32;      // What's the minimum angle you can accept?
+    double vert_merging = 0.2;  // How big do you want to merge clusters "inside" clusters disregarding the angle?
+
+    double min_req_closeness = 1.0; // How close does a wall need to be to at least one of the other two's for a possible corner?
+                                    // Can be set to infinity, in this case, every combination of 3 clusters is intersected to look for a triangle
+
+
+
 
     const std::array<unsigned char, 3> colorBlack = {0, 0, 0};
     const std::array<unsigned char, 3> colorRed = {255, 0, 0};
@@ -47,78 +55,156 @@ namespace RoomCReconstruction {
         std::cout << "Collecting Clusters ...\n";
         double debugPercent = 0;
 
+      std::vector<bool> addedPoints = std::vector<bool>(local_pcas.size(), false);
+        std::queue<size_t> pointQueue;
+
+
+      for (int localPcasIter = 0; localPcasIter != local_pcas.size(); ++localPcasIter) {
+        if (!addedPoints[localPcasIter]) {
+          pointQueue.push(localPcasIter);
+          addedPoints[localPcasIter] = true;
+        }
+
         // For all points
-        for (int i = 0; i != local_pcas.size(); ++i) {
-            if (((double) i / local_pcas.size())*1000 >= (debugPercent+0.1)) {
-              std::cout << (++debugPercent)/10 << "%, " << clusters.size() << " clusters found\n";
-            }
+        while (!pointQueue.empty()) {
+          int i = pointQueue.front();
+          pointQueue.pop();
 
-            const double ev_sum{local_pcas[i].eigenvalues.sum()};
-            const double lambda_1{local_pcas[i].eigenvalues.x() / ev_sum};
-            const double lambda_2{local_pcas[i].eigenvalues.y() / ev_sum};
+          if (((double)i / local_pcas.size()) * 100 >= (debugPercent + 1)) {
+            std::cout << (++debugPercent) << "%, " << clusters.size() << " clusters found\n";
 
+            // printPointsWRTClusters("./video/A_video_step1_" + formatInteger(i, 12)  + ".ply", points, clusters, colors);
+          }
 
-            const double stringPointScore = 1 - (local_pcas[i].eigenvalues.y() / local_pcas[i].eigenvalues.x());
-            const double planarPointScore = 1 - (local_pcas[i].eigenvalues.z() / local_pcas[i].eigenvalues.y());
+          const double ev_sum{ local_pcas[i].eigenvalues.sum() };
+          const double lambda_1{ local_pcas[i].eigenvalues.x() / ev_sum };
+          const double lambda_2{ local_pcas[i].eigenvalues.y() / ev_sum };
 
-            // Go to next point if Score is too low
+          if (local_pcas[i].eigenvalues.x() < DBL_EPSILON ||
+              local_pcas[i].eigenvalues.y() < DBL_EPSILON ||
+              local_pcas[i].eigenvalues.z() < DBL_EPSILON)
+            continue;
+          const double stringPointScore =
+            1 - (local_pcas[i].eigenvalues.y() / local_pcas[i].eigenvalues.x());
+          const double planarPointScore =
+            1 - (local_pcas[i].eigenvalues.z() / local_pcas[i].eigenvalues.y());
+
+          // std::cout << "Z: " << local_pcas[i].eigenvalues.z() << "Y: " << local_pcas[i].eigenvalues.y() << ", score: " << planarPointScore << "\n";
+          //  Go to next point if Score is too low
 
           if (planarPointScore > 0.4 || stringPointScore > 0.2) {
             colors[i] = colorGrey;
           }
-            if (planarPointScore < 0.95 || stringPointScore > 0.3) continue;
+          if (planarPointScore < 0.95 || stringPointScore > 0.3) {
+            continue;
+          }
+
+          std::vector<std::size_t> ret_indexes(21);
+          std::vector<double> dists_sqrd(21);
+          nanoflann::KNNResultSet<double> result_set{ 21 };
+          result_set.init(ret_indexes.data(), dists_sqrd.data());
+
+          const Eigen::Matrix<double, 3, Eigen::Dynamic>& points{ search_tree.m_data_matrix.get() };
+
+          const double* query_point_data{ points.col(static_cast<Eigen::Index>(i)).data() };
+
+          search_tree.index->findNeighbors(result_set, query_point_data, nanoflann::SearchParams{});
 
 
-            bool found = false;
-            for (int j = 0; j != clusters.size(); j++) {
-                if (clusters[j].checkAndAdd(
-                    points.col(static_cast<Eigen::Index>(i)), local_pcas[i].local_base.col(2), i)) {
-                    //colors[i] = clusters[j].color;
-                    found = true;
-                    break;
-                }
+          double myWeight = planarPointScoreToWeight(planarPointScore);
+          bool found = false;
+          for (int j = 0; j != clusters.size(); j++) {
+            if (clusters[j].checkAndAdd(points.col(static_cast<Eigen::Index>(i)),
+                                        local_pcas[i].local_base.col(2),
+                                        0.1,
+                                        req_angle,
+                                        i,
+                                        myWeight,
+                                        true)) {
+              // colors[i] = clusters[j].color;
+              found = true;
+              break;
             }
-            if (!found) {
-                Cluster newCluster;
-                newCluster.normal = local_pcas[i].local_base.col(2);
-                newCluster.center = points.col(static_cast<Eigen::Index>(i));
-                clusters.push_back(newCluster);
-                //i--;   //Makes that we process the same point again s.t. we can add it to the new cluster.
+          }
+          if (!found) {
+            Cluster newCluster;
+            newCluster.normal = local_pcas[i].local_base.col(2);
+            newCluster.center = points.col(static_cast<Eigen::Index>(i));
+            newCluster.markerPoints.push_back(points.col(static_cast<Eigen::Index>(i)));
+            if (!newCluster.checkAndAdd(points.col(static_cast<Eigen::Index>(i)),
+                                        local_pcas[i].local_base.col(2),
+                                        0.1,
+                                        req_angle,
+                                        i,
+                                        myWeight,
+                                        true)) {
+              std::cout << "ERROR: ADDING CLUSTER WITH POINT CREATION FAILED!\n";
+              exit(0);
             }
+
+            clusters.push_back(newCluster);
+            // i--;   //Makes that we process the same point again s.t. we can add it to the new cluster.
+          }
+
+          // Prepare next queue-members
+          for (int xyz123 = 0; xyz123 < ret_indexes.size(); xyz123++) {
+            if (!addedPoints[xyz123]) {
+              pointQueue.push(xyz123);
+              addedPoints[xyz123] = true;
+            }
+          }
+
         }
+      }
+
+
 
         std::cout << "Found " << clusters.size() << " Clusters\n";
+
+
+      /*for (int i = 0; i < clusters.size(); i++) {
+        clusters[i].color[1] = std::floor(i / 255);
+        clusters[i].color[2] = i % 255;
+      }*/
+      printPointsWRTClusters("output_clustering_000.ply", points, clusters, colors);
+
 
         /*for (int i = 0; i < clusters.size(); i++) {
             std::cout << "Cluster " << i << ": #points: " << clusters[i].points.size();
         }*/
 
-        // Remove small clusters
-        for (auto it = clusters.begin(); it != clusters.end(); it++) {
-          if ((*it).points.size() < 200) {
-            clusters.erase(it--);
-          }
-        }
 
-      std::cout << clusters.size() << " Clusters after removing small ones\n";
-      printPointsWRTClusters("output_clustering_1_after_removingSmallones.ply", points, clusters, colors);
+
+      /*for (int i = 0; i < clusters.size(); i++) {
+        if ((std::floor(i / 255) == 0) && (i % 255 == 126)) {
+          clusters[i].color = colorRed;
+        } else if ((std::floor(i / 255) == 1) && (i % 255 == 147)) {
+          clusters[i].color = colorGreen;
+        } else {
+          clusters[i].color = colorBlack;
+        }
+      }
+      printPointsWRTClusters("output_clustering_KEYCLUSTER.ply", points, clusters, colors);*/
+
+
+
 
       struct MergingReq {
         double angleFracMerging;
         double distMerging;
         double reqPoints;
+        bool requireCloseness;
       };
 
-      std::vector<MergingReq> mergingQueue = {{64, 0.05, 0},
-                                               {32, 0.05, 0},
-                                              {24, 0.1, 0},
-                                              {16, 0.15, 0},
-                                              {8, 0.1, 0.5},
-                                              {8, 0.2, 0.5},
-                                              {4, 0.2, 0.6}};
+
+      std::vector<MergingReq> mergingQueue = {{req_angle, 0.1, 0, true},                        // Merges close similar clusters
+                                              {5, vert_merging, 0.5, true},                 // Merges unplanar regions to a plane, like curtains
+                                              {req_angle*2, 0.1 / 2, 0, false}};     // Merges distant clusters belonging to the same wall.
+                                                                                                                                 // Need to be quite exact, otherwise we are possibly going to merge wall+furniture, slightly change the walls normal and then arrow-finding is less exact and may even get wrong arrows
 
 
       bool stillmerging = true;
+      int video_mergingCounter = 0;
       for (MergingReq mergReq : mergingQueue) {
         std::cout << "distMerging: " << mergReq.distMerging << "\n";
         std::cout << "angleFracMerging: " << mergReq.angleFracMerging << "\n";
@@ -130,7 +216,7 @@ namespace RoomCReconstruction {
               Cluster& smallerC = clusters[i].points.size() >= clusters[j].points.size() ? clusters[j]:clusters[i];
               //std::cout << biggerC.mergedCluster;
               if (biggerC.mergedCluster || smallerC.mergedCluster) continue;
-              biggerC.tryMergeCluster(smallerC, mergReq.distMerging, mergReq.angleFracMerging, mergReq.reqPoints);
+              biggerC.tryMergeCluster(smallerC, mergReq.distMerging, mergReq.angleFracMerging, mergReq.reqPoints, mergReq.requireCloseness);
             }
           }
           stillmerging = false;
@@ -141,10 +227,26 @@ namespace RoomCReconstruction {
             }
           }
         }
+        printPointsWRTClusters("./video/A_video_step2_" + formatInteger(video_mergingCounter++, 12)  + ".ply", points, clusters, colors);
       }
 
       std::cout << clusters.size() << " Clusters after merging\n";
       printPointsWRTClusters("output_clustering_2_after_merging.ply", points, clusters, colors);
+
+
+
+      // Remove small clusters
+      for (auto it = clusters.begin(); it != clusters.end(); it++) {
+        if ((*it).points.size() < 200) {
+          clusters.erase(it--);
+        }
+      }
+
+      std::cout << clusters.size() << " Clusters after removing small ones\n";
+      printPointsWRTClusters("output_clustering_1_after_removingSmallones.ply", points, clusters, colors);
+
+
+
 
 
 
@@ -153,6 +255,12 @@ namespace RoomCReconstruction {
       }
       printPointsWRTClusters("output_clustering_0_MAIN.ply", points, clusters, colors);
 
+
+      std::vector<Eigen::Vector3d> verticesMarker;
+      for (int mark_i = 0; mark_i < clusters.size(); mark_i++) {
+        verticesMarker.insert(verticesMarker.end(), clusters[mark_i].markerPoints.begin(), clusters[mark_i].markerPoints.end());
+      }
+      writePoints("output_clustering_MARKER.ply", verticesMarker);
 
 
 
@@ -315,15 +423,33 @@ namespace RoomCReconstruction {
         for (int i = k+1; i < clusters.size(); i++) {
           std::cout << "Finding Triangles: " << k << "," << i << "\n";
           if (!checkSomewhatOrthogonal(clusters[k], clusters[i])) continue;
+
           for (int j = i + 1; j < clusters.size(); j++) {
             if (!checkSomewhatOrthogonal(clusters[k], clusters[j])) continue;
             if (!checkSomewhatOrthogonal(clusters[i], clusters[j])) continue;
+
+
+
             Eigen::Vector3d cornerPoint;
             if (RoomCReconstruction::intersect3Clusters(clusters[k],
                                                         clusters[i],
                                                         clusters[j],
                                                         cornerPoint)) {
               if (insideBB(cornerPoint)) {
+
+                // Make it run faster, we don't really need to intersect every closter with every other two
+                double dist_ki = clusters[k].distanceToOtherCluster(clusters[i]);
+                double dist_kj = clusters[k].distanceToOtherCluster(clusters[j]);
+                double dist_ij = clusters[i].distanceToOtherCluster(clusters[j]);
+
+
+                if (dist_ki > min_req_closeness && dist_kj > min_req_closeness) continue;  // If k is not a neighbor of either
+                if (dist_ki > min_req_closeness && dist_ij > min_req_closeness) continue;  // If i is not a neighbor of either
+                if (dist_kj > min_req_closeness && dist_ij > min_req_closeness) continue;  // If j is not a neighbor of either
+
+
+
+
                 std::cout << "Intersection: " << k << "," << i << "," << j << "\n";
 
                 corners.push_back(cornerPoint);
@@ -373,7 +499,7 @@ namespace RoomCReconstruction {
 
 
                 // For debugging
-                if (k == 15 && i == 18 && j == 27) {
+                if (k == 0 && i == 1 && j == 26) {
                   debugFracs = true;
 
                   std::cout << "Trying Combination: i:" << i << ",j:" << j
@@ -414,8 +540,8 @@ namespace RoomCReconstruction {
 
 
                 double arrowPiecesSize = 0.1;
-                double emptyRequirement = 0.5; // required empty space behind line, i.e. the minimum thickness of walls.
-                double searchWidth = 4.0;      // Searches in this radius for occpied pieces. So we can reconstruct occluded parts only within this distance.
+                double emptyRequirement = 0.1; // required empty space behind line, i.e. the minimum thickness of walls.
+                double searchWidth = 2;      // Searches in this radius for occpied pieces. So we can reconstruct occluded parts only within this distance.
                                                // Can of course set to "infinity", the algorithm then uses just the cluster-boundaries. But is extremely slow.
 
                 double max_pos_a1_d = std::max(boundC1[0], boundC2[0]);
@@ -487,6 +613,8 @@ namespace RoomCReconstruction {
                   double max_neg_2 = getMaxNeg(false, i23456);
 
                   for (Eigen::Vector2d& p1 : fP) {
+                    if (abs(p1[0]) < 0.05) continue; // ignore points very close to line, since it may not be exact
+                    if (abs(p1[1]) < 0.05) continue; // ignore points very close to line, since it may not be exact
                     int idxX = ((int) std::floor((p1[0]) / arrowPiecesSize)) + max_neg_1;
                     int idxY = ((int) std::floor((p1[1]) / arrowPiecesSize)) + max_neg_2;
 
@@ -536,16 +664,41 @@ namespace RoomCReconstruction {
 
                 }
 
+
+                const auto specialArrowDecInc{ [](int arrow_i) -> int {
+
+                  if (arrow_i < 0 && arrow_i >= -6) return arrow_i+1;
+                  if (arrow_i < -6 && arrow_i >= -12) return arrow_i+2;
+                  if (arrow_i < -12 && arrow_i >= -20) return arrow_i+4;
+                  if (arrow_i < -20 && arrow_i >= -36) return arrow_i+8;
+
+                  if (arrow_i >= 0 && arrow_i < 6) return arrow_i+1;
+                  if (arrow_i >= 6 && arrow_i < 12) return arrow_i+2;
+                  if (arrow_i >= 12 && arrow_i < 20) return arrow_i+4;
+                  if (arrow_i >= 20 && arrow_i < 36) return arrow_i+8;
+
+                  return arrow_i + 16;
+                }};
+
+
+
+
                 double min_inw_occ = 0.15;
                 double best_score = -1;
                 int best_a1 = 0;
                 int best_a2 = 0;
                 int best_a3 = 0;
                 bool bestIsInwards = false;
-                for (int a1_i = -max_neg_a1; a1_i < max_pos_a1; a1_i++) {
+                for (int a1_i = -max_neg_a1; a1_i <= max_pos_a1; a1_i = specialArrowDecInc(a1_i)) {
                   if (a1_i == 0) continue;
-                  for (int a2_i = -max_neg_a2; a2_i < max_pos_a2; a2_i++) {
+                  //if (a1_i == 1 || a1_i == -1) continue; // Don't allow very small arrows since there could be points just behind the intersection that
+                                                         // give a wrong impression and turn the arrow around.
+                                                         // If you need such small walls, consider adapting the score s.t. bigger walls have higher priority
+
+
+                  for (int a2_i = -max_neg_a2; a2_i <= max_pos_a2; a2_i = specialArrowDecInc(a2_i)) {
                     if (a2_i == 0) continue;
+                    //if (a2_i == 1 || a2_i == -1) continue;
 
                     // Fast forward C1_occup
                     double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0, flatQuadrats[0]);
@@ -558,8 +711,9 @@ namespace RoomCReconstruction {
                       if (C1_revOcc <= 0.3) continue;
                     }
 
-                    for (int a3_i = -max_neg_a3; a3_i < max_pos_a3; a3_i++) {
+                    for (int a3_i = -max_neg_a3; a3_i <= max_pos_a3; a3_i = specialArrowDecInc(a3_i)) {
                       if (a3_i == 0) continue;
+                      //if (a3_i == 1 || a3_i == -1) continue;
 
                       double C2_occup = computeOccupationSimplifier(a1_i, a3_i, 1, flatQuadrats[1]);
                       if (C2_occup > 0 && C2_occup <= min_inw_occ) continue; // Fast forwarding
@@ -686,7 +840,7 @@ namespace RoomCReconstruction {
 
 
 
-      std::vector<int> exc;
+      /*std::vector<int> exc;
 
       const auto findFirstNotExcl{[](std::vector<TriangleNode3D> intersection_triangles, std::vector<int> exc) -> int {
         std::cout << "Exclusions: \n";
@@ -723,7 +877,7 @@ namespace RoomCReconstruction {
           }
           cur = findFirstNotExcl(intersection_triangles, exc);
         }
-      }
+      }*/
 
 
 
@@ -1392,7 +1546,10 @@ bool recursiveBestCircle(const std::vector<TriangleNode3D>& iT,
 
     }
 
-
+    double planarPointScoreToWeight(double planarPointScore) {
+      return 1;
+      //return gaussian_1d(planarPointScore, 1.0, 0.0, 0.98);
+    }
 
     void printPointsWRTClusters(const std::string& filename,
                                 const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,

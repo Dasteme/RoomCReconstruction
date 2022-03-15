@@ -38,6 +38,7 @@ namespace RoomCReconstruction {
   }
 
 
+  // A: Amplitude of the curve, x0: center of the curve,what is the expected/best result?
   double gaussian_1d(const double x, const double A, const double x0, const double sigma_x) {
     const double delta_x{x - x0};
     const double denominator_x{2.0 * sigma_x * sigma_x};
@@ -73,7 +74,7 @@ namespace RoomCReconstruction {
 
 
   void printMyVec(const Eigen::Vector3d& vec) {
-    std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]";
+    std::cout << "[" << vec.x() << "," << vec.y() << "," << vec.z() << "]\n";
   }
   void printMyVec2d(const Eigen::Vector2d& vec) {
     std::cout << "[" << vec.x() << "," << vec.y() << "]";
@@ -256,6 +257,11 @@ int getCircularIndex(int arraySize, int index) {
 }
 double formatDouble(double d, int digits) {
   return ((int) (d*std::pow(10, digits))) / (double) std::pow(10, digits);
+}
+
+std::string formatInteger(unsigned int i, unsigned int preceingZeros) {
+  std::string i_string = std::to_string(i);
+  return std::string(preceingZeros - std::min(preceingZeros, i_string.length()), '0') + i_string;
 }
 }
 
