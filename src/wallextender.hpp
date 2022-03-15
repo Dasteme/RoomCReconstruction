@@ -59,8 +59,6 @@ namespace RoomCReconstruction {
 
         std::vector<std::array<int, 3>> supportiveCubes;
 
-        double addedPointsWeigths = 0;
-
         Cluster() {
             color[0] = rand() % 256;
             color[1] = rand() % 256;
@@ -102,28 +100,27 @@ namespace RoomCReconstruction {
           return (gaussian_distance > 0.6 && gaussian_angle > 0.6 && (dist_param == -1 || checkDistCloseEnough(point, dist_param)));
         }
 
-        void Add(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex, double weight) {
+        void Add(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex) {
           points.push_back(pointIndex);
           pointsReal.push_back(point);
           pointsNormals.push_back(pointNormal);
-          updateCenter(point, weight);
-          updateNormal(pointNormal, weight);
-          addedPointsWeigths +=weight;
+          updateCenter(point);
+          updateNormal(pointNormal);
         }
       void AddNoNormal(Eigen::Vector3d point, size_t pointIndex) {
         points.push_back(pointIndex);
         pointsReal.push_back(point);
       }
 
-        bool checkAndAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, double dist, double angle_frac, size_t pointIndex, double weight, bool requireCloseness) {
+        bool checkAndAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, double dist, double angle_frac, size_t pointIndex, bool requireCloseness) {
           double dist_param = requireCloseness ? 0:-1;
           if (checkAdd(point, pointNormal, dist, angle_frac, dist_param)) {
-            Add(point, pointNormal, pointIndex, weight);
+            Add(point, pointNormal, pointIndex);
             if (dist_param >= 0.1) {markerPoints.push_back(point);}
             return true;
           }
           if (checkAdd(point, -pointNormal, dist, angle_frac, dist_param)) {
-            Add(point, -pointNormal, pointIndex, weight);
+            Add(point, -pointNormal, pointIndex);
             if (dist_param >= 0.1) {markerPoints.push_back(point);}
             return true;
           }
@@ -133,20 +130,17 @@ namespace RoomCReconstruction {
 
 
 
-        void updateCenter(Eigen::Vector3d newPoint, double weight) {
-          //center = (((center * addedPointsWeigths) + (newPoint*weight)) / points.size()).normalized();
-
+        void updateCenter(Eigen::Vector3d newPoint) {
           center = (center * (points.size() - 1) + newPoint) / points.size();
             //std::cout << "Center is now: " << "[" << center.x() << "," << center.y() << "," << center.z() << "]" << "\n";
 
         }
 
-        void updateNormal(Eigen::Vector3d newNormal, double weight) {
-          normal = (((normal * addedPointsWeigths) + (newNormal*weight)) / points.size()).normalized();
+        void updateNormal(Eigen::Vector3d newNormal) {
+            normal = (normal * (points.size() - 1) + newNormal) / points.size();
 
-
+            //normal = (((normal * addedPointsWeigths) + (newNormal*weight)) / points.size()).normalized();
             //std::cout << "Center is now: " << "[" << center.x() << "," << center.y() << "," << center.z() << "]" << "\n";
-
         }
 
 
@@ -190,9 +184,8 @@ namespace RoomCReconstruction {
           if (reqPercent == 0) {
 
             if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac, unnec_dist_p)) {
-              double weight = (toMergeCluster.addedPointsWeigths / toMergeCluster.points.size());
               for (int i = 0; i < toMergeCluster.points.size(); i++) {
-                Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i], weight); // Note: we are abandoning the points that do not fit in.
+                Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]); // Note: we are abandoning the points that do not fit in.
               }
                 markerPoints.insert(markerPoints.end(), toMergeCluster.markerPoints.begin(),toMergeCluster.markerPoints.end());
               toMergeCluster.mergedCluster = true;
@@ -200,9 +193,8 @@ namespace RoomCReconstruction {
 
             // Negative normals
             if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, dist, angle_frac, unnec_dist_p)) {
-              double weight = (toMergeCluster.addedPointsWeigths / toMergeCluster.points.size());
               for (int i = 0; i < toMergeCluster.points.size(); i++) {
-                Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i], weight);
+                Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
 
               }
                 markerPoints.insert(markerPoints.end(), toMergeCluster.markerPoints.begin(),toMergeCluster.markerPoints.end());
@@ -224,11 +216,9 @@ namespace RoomCReconstruction {
             if (possibleMergePoints / toMergeCluster.points.size() >= reqPercent) {
               for (int i = 0; i < toMergeCluster.points.size(); i++) {
                 if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac, unnec_dist_p)) {
-                  double weight = (toMergeCluster.addedPointsWeigths / toMergeCluster.points.size());
-                  Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i], weight);
+                  Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
                 } else if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, dist, angle_frac, unnec_dist_p)) {
-                  double weight = (toMergeCluster.addedPointsWeigths / toMergeCluster.points.size());
-                  Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i], weight);
+                  Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
                 }
               }
                 markerPoints.insert(markerPoints.end(), toMergeCluster.markerPoints.begin(),toMergeCluster.markerPoints.end());
@@ -545,7 +535,6 @@ void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::
 Eigen::Vector3d rotateAround(Eigen::Vector3d toRotate, Eigen::Vector3d aroundRotate);
 std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d center, Eigen::Vector3d normal, const std::vector<Eigen::Vector3d>& pnts, Eigen::Vector3d a1, Eigen::Vector3d a2);
 
-double planarPointScoreToWeight(double planarPointScore);
 void printPointsWRTClusters(const std::string& filename,
                             const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
                             const std::vector <Cluster>& clusters,

@@ -111,7 +111,6 @@ namespace RoomCReconstruction {
           search_tree.index->findNeighbors(result_set, query_point_data, nanoflann::SearchParams{});
 
 
-          double myWeight = planarPointScoreToWeight(planarPointScore);
           bool found = false;
           for (int j = 0; j != clusters.size(); j++) {
             if (clusters[j].checkAndAdd(points.col(static_cast<Eigen::Index>(i)),
@@ -119,7 +118,6 @@ namespace RoomCReconstruction {
                                         0.1,
                                         req_angle,
                                         i,
-                                        myWeight,
                                         true)) {
               // colors[i] = clusters[j].color;
               found = true;
@@ -136,7 +134,6 @@ namespace RoomCReconstruction {
                                         0.1,
                                         req_angle,
                                         i,
-                                        myWeight,
                                         true)) {
               std::cout << "ERROR: ADDING CLUSTER WITH POINT CREATION FAILED!\n";
               exit(0);
@@ -1544,11 +1541,6 @@ bool recursiveBestCircle(const std::vector<TriangleNode3D>& iT,
       }
 
 
-    }
-
-    double planarPointScoreToWeight(double planarPointScore) {
-      return 1;
-      //return gaussian_1d(planarPointScore, 1.0, 0.0, 0.98);
     }
 
     void printPointsWRTClusters(const std::string& filename,
