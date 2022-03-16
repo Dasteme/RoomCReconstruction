@@ -21,6 +21,15 @@ namespace RoomCReconstruction {
     constexpr double minwalldistance = 0.1; // 10cm
 
 
+    struct BoundingBox {
+        double minX = std::numeric_limits<double>::max();
+        double minY = std::numeric_limits<double>::max();
+        double minZ = std::numeric_limits<double>::max();
+        double maxX = std::numeric_limits<double>::min();
+        double maxY = std::numeric_limits<double>::min();
+        double maxZ = std::numeric_limits<double>::min();
+    };
+
     class ClusterContour {
     public:
         std::vector <size_t> contourPoints;
@@ -534,6 +543,21 @@ bool checkSomewhatOrthogonal(Cluster c1, Cluster c2);
 void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::Vector3d arrow, std::array<int, 2> res);
 Eigen::Vector3d rotateAround(Eigen::Vector3d toRotate, Eigen::Vector3d aroundRotate);
 std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d center, Eigen::Vector3d normal, const std::vector<Eigen::Vector3d>& pnts, Eigen::Vector3d a1, Eigen::Vector3d a2);
+
+
+    bool insideBB(BoundingBox& bb, Eigen::Vector3d& p);
+    void intersect3ClustersForTriangle(int idxC1, int idxC2, int idxC3,
+                                       std::vector<Cluster>& clusters,
+                                       std::vector<TriangleNode3D>& intersection_triangles,
+                                       BoundingBox& bb);
+    std::array<double, 4> calcBoundaries(const std::vector<Eigen::Vector2d>& fP);
+    double computeOccupation(int min_i, int max_i, int min_j, int max_j, std::vector<std::vector<bool>> flatQuadrat);
+    double computeOccupationSimplifier(int x, int y, int cl_idx, std::vector<std::vector<bool>>& flatQuadrat, std::array<int, 6>& max_npA);
+    double computeOccupationReversedSimplifier(int x, int y, int cl_idx, int reversedLen, std::vector<std::vector<bool>>& flatQuadrat, std::array<int, 6>& max_npA);
+    int getNegArrInd(bool x_axis, int clIdx);
+    void printFlatQuadrants(const std::string& filename, std::vector<std::vector<bool>> flatQuadrat, double arrowPiecesSize, int shift_x, int shift_y);
+    int specialArrowDecInc(int arrow_i);
+
 
 void printPointsWRTClusters(const std::string& filename,
                             const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,

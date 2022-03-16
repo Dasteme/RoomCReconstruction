@@ -13,6 +13,8 @@
 
 namespace RoomCReconstruction {
 
+
+
     double req_angle = 32;      // What's the minimum angle you can accept?
     double vert_merging = 0.2;  // How big do you want to merge clusters "inside" clusters disregarding the angle?
 
@@ -284,31 +286,23 @@ namespace RoomCReconstruction {
 
 
       double cubesSize = 0.1;
-      double minX = std::numeric_limits<double>::max();
-      double minY = std::numeric_limits<double>::max();
-      double minZ = std::numeric_limits<double>::max();
-      double maxX = std::numeric_limits<double>::min();
-      double maxY = std::numeric_limits<double>::min();
-      double maxZ = std::numeric_limits<double>::min();
+      BoundingBox bb;
+
       for (int i = 0; i != local_pcas.size(); ++i) {
-        if (points.col(static_cast<Eigen::Index>(i))[0] < minX) {minX = points.col(static_cast<Eigen::Index>(i))[0]; }
-        if (points.col(static_cast<Eigen::Index>(i))[1] < minY) {minY = points.col(static_cast<Eigen::Index>(i))[1]; }
-        if (points.col(static_cast<Eigen::Index>(i))[2] < minZ) {minZ = points.col(static_cast<Eigen::Index>(i))[2]; }
-        if (points.col(static_cast<Eigen::Index>(i))[0] > maxX) {maxX = points.col(static_cast<Eigen::Index>(i))[0]; }
-        if (points.col(static_cast<Eigen::Index>(i))[1] > maxY) {maxY = points.col(static_cast<Eigen::Index>(i))[1]; }
-        if (points.col(static_cast<Eigen::Index>(i))[2] > maxZ) {maxZ = points.col(static_cast<Eigen::Index>(i))[2]; }
+        if (points.col(static_cast<Eigen::Index>(i))[0] < bb.minX) {bb.minX = points.col(static_cast<Eigen::Index>(i))[0]; }
+        if (points.col(static_cast<Eigen::Index>(i))[1] < bb.minY) {bb.minY = points.col(static_cast<Eigen::Index>(i))[1]; }
+        if (points.col(static_cast<Eigen::Index>(i))[2] < bb.minZ) {bb.minZ = points.col(static_cast<Eigen::Index>(i))[2]; }
+        if (points.col(static_cast<Eigen::Index>(i))[0] > bb.maxX) {bb.maxX = points.col(static_cast<Eigen::Index>(i))[0]; }
+        if (points.col(static_cast<Eigen::Index>(i))[1] > bb.maxY) {bb.maxY = points.col(static_cast<Eigen::Index>(i))[1]; }
+        if (points.col(static_cast<Eigen::Index>(i))[2] > bb.maxZ) {bb.maxZ = points.col(static_cast<Eigen::Index>(i))[2]; }
       }
-      std::cout << "X: [" << minX << "," << maxX << "]\n";
-      std::cout << "Y: [" << minY << "," << maxY << "]\n";
-      std::cout << "Z: [" << minZ << "," << maxZ << "]\n";
+      std::cout << "X: [" << bb.minX << "," << bb.maxX << "]\n";
+      std::cout << "Y: [" << bb.minY << "," << bb.maxY << "]\n";
+      std::cout << "Z: [" << bb.minZ << "," << bb.maxZ << "]\n";
 
-      const auto insideBB{[minX, maxX, minY, maxY, minZ, maxZ](Eigen::Vector3d p) -> bool {
-        return p[0] >= minX-0.1 && p[0] <= maxX+0.1 && p[1] >= minY-0.1 && p[1] <= maxY+0.1 && p[2] >= minZ-0.1 && p[2] <= maxZ+0.1;
-      }};
-
-      double roomDistX = maxX-minX;
-      double roomDistY = maxY-minY;
-      double roomDistZ = maxZ-minZ;
+      double roomDistX = bb.maxX-bb.minX;
+      double roomDistY = bb.maxY-bb.minY;
+      double roomDistZ = bb.maxZ-bb.minZ;
       int rCX = std::ceil((roomDistX) / cubesSize);
       int rCY = std::ceil((roomDistY) / cubesSize);
       int rCZ = std::ceil((roomDistZ) / cubesSize);
@@ -322,7 +316,7 @@ namespace RoomCReconstruction {
           for (double zIter = 0; zIter < rCZ; zIter+=cubesSize) {
 
             //std::cout << "Accessing" << xIter << "," << yIter << "," << zIter << "\n";
-            roomCubes123[xIter][yIter][zIter].init(minX+xIter*cubesSize, minY+yIter*cubesSize, minZ+zIter*cubesSize, cubesSize);
+            roomCubes123[xIter][yIter][zIter].init(bb.minX+xIter*cubesSize, bb.minY+yIter*cubesSize, bb.minZ+zIter*cubesSize, cubesSize);
           }
         }
       }
@@ -425,377 +419,8 @@ namespace RoomCReconstruction {
             if (!checkSomewhatOrthogonal(clusters[k], clusters[j])) continue;
             if (!checkSomewhatOrthogonal(clusters[i], clusters[j])) continue;
 
+            intersect3ClustersForTriangle(k, i, j, clusters, intersection_triangles, bb);
 
-
-            Eigen::Vector3d cornerPoint;
-            if (RoomCReconstruction::intersect3Clusters(clusters[k],
-                                                        clusters[i],
-                                                        clusters[j],
-                                                        cornerPoint)) {
-              if (insideBB(cornerPoint)) {
-
-                // Make it run faster, we don't really need to intersect every closter with every other two
-                double dist_ki = clusters[k].distanceToOtherCluster(clusters[i]);
-                double dist_kj = clusters[k].distanceToOtherCluster(clusters[j]);
-                double dist_ij = clusters[i].distanceToOtherCluster(clusters[j]);
-
-
-                if (dist_ki > min_req_closeness && dist_kj > min_req_closeness) continue;  // If k is not a neighbor of either
-                if (dist_ki > min_req_closeness && dist_ij > min_req_closeness) continue;  // If i is not a neighbor of either
-                if (dist_kj > min_req_closeness && dist_ij > min_req_closeness) continue;  // If j is not a neighbor of either
-
-
-
-
-                std::cout << "Intersection: " << k << "," << i << "," << j << "\n";
-
-                corners.push_back(cornerPoint);
-                cornerColors.push_back(colorGreen);
-
-                Cluster& c1 = clusters[k];
-                Cluster& c2 = clusters[i];
-                Cluster& c3 = clusters[j];
-
-                Eigen::Vector3d edgeLine1;
-                Eigen::Vector3d edgeLine2;
-                Eigen::Vector3d edgeLine3;
-
-                // None of the if's should not happen. We got an intersection with 3 planes, so we should have all 3 edges. Note that we calculate the edgeLines here
-                if (!RoomCReconstruction::intersect2Clusters(c1, c2, edgeLine1)) { continue; }
-                if (!RoomCReconstruction::intersect2Clusters(c1, c3, edgeLine2)) { continue; }
-                if (!RoomCReconstruction::intersect2Clusters(c2, c3, edgeLine3)) { continue; }
-
-                std::vector<Eigen::Vector2d> flatpointsC1 =
-                  transformPlanePointsTo2D(cornerPoint, c1.normal, c1.pointsReal, edgeLine1, edgeLine2);
-                std::vector<Eigen::Vector2d> flatpointsC2 =
-                  transformPlanePointsTo2D(cornerPoint, c2.normal, c2.pointsReal, edgeLine1, edgeLine3);
-                std::vector<Eigen::Vector2d> flatpointsC3 =
-                  transformPlanePointsTo2D(cornerPoint, c3.normal, c3.pointsReal, edgeLine2, edgeLine3);
-
-                const auto calcBoundaries{
-                  [](const std::vector<Eigen::Vector2d>& fP) -> std::array<double, 4> {
-                    double minX = 0; // Note that we all set to 0 instead of "max double".
-                    double maxX = 0;
-                    double minY = 0;
-                    double maxY = 0;
-
-                    for (Eigen::Vector2d p1 : fP) {
-                      if (p1[0] < minX) { minX = p1[0]; }
-                      if (p1[0] > maxX) { maxX = p1[0]; }
-                      if (p1[1] < minY) { minY = p1[1]; }
-                      if (p1[1] > maxY) { maxY = p1[1]; }
-                    }
-
-                    return {
-                      maxX, std::abs(minX), maxY, std::abs(minY)
-                    }; // maxX is 0 or greater, minX is 0 or smaller (so we use "abs" only on min's)
-                  }
-                };
-
-
-
-
-                // For debugging
-                if (k == 0 && i == 1 && j == 26) {
-                  debugFracs = true;
-
-                  std::cout << "Trying Combination: i:" << i << ",j:" << j
-                            << ",c1:" << k << ",c2:" << i
-                            << ",c3:" << j << "\n";
-                  writePoints("A_DEBUG_bla1.ply", simple2Dto3D(flatpointsC1));
-                  writePoints("A_DEBUG_bla2.ply", simple2Dto3D(flatpointsC2));
-                  writePoints("A_DEBUG_bla3.ply", simple2Dto3D(flatpointsC3));
-                } else {
-                  debugFracs = false;
-                }
-
-
-
-                std::array<double, 4> boundC1 = calcBoundaries(flatpointsC1);
-                std::array<double, 4> boundC2 = calcBoundaries(flatpointsC2);
-                std::array<double, 4> boundC3 = calcBoundaries(flatpointsC3);
-
-
-                const auto computeOccupation{ [](int min_i, int max_i, int min_j, int max_j, std::vector<std::vector<bool>> flatQuadrat) -> double {
-
-                  if ((max_i-min_i) < 1 || (max_j-min_j) < 1) {
-                    std::cout << "computeOccError: distance is smaller than 1\n";
-                  }
-
-                  int summed = 0;
-                  for (int i = min_i; i < max_i; i++) {
-                    for (int j = min_j; j < max_j; j++) {
-                      if (i < flatQuadrat.size() && j < flatQuadrat[i].size()) {  // If i or j is out of boundaries, assume there is an empty flatQ
-                        if (flatQuadrat[i][j]) {
-                          summed++;
-                        }
-                      }
-                    }
-                  }
-                  return (double) summed / ((max_i-min_i) * (max_j-min_j));
-                }};
-
-
-                double arrowPiecesSize = 0.1;
-                double emptyRequirement = 0.1; // required empty space behind line, i.e. the minimum thickness of walls.
-                double searchWidth = 2;      // Searches in this radius for occpied pieces. So we can reconstruct occluded parts only within this distance.
-                                               // Can of course set to "infinity", the algorithm then uses just the cluster-boundaries. But is extremely slow.
-
-                double max_pos_a1_d = std::max(boundC1[0], boundC2[0]);
-                double max_neg_a1_d = std::max(boundC1[1], boundC2[1]);
-                double max_pos_a2_d = std::max(boundC1[2], boundC3[0]);
-                double max_neg_a2_d = std::max(boundC1[3], boundC3[1]);
-                double max_pos_a3_d = std::max(boundC2[2], boundC3[2]);
-                double max_neg_a3_d = std::max(boundC2[3], boundC3[3]);
-
-
-                const auto applyDiscrete{ [arrowPiecesSize](double len) -> int {
-                  return std::ceil(len / arrowPiecesSize);
-                }};
-                int max_pos_a1 = std::min(applyDiscrete(max_pos_a1_d), applyDiscrete(searchWidth));
-                int max_neg_a1 = std::min(applyDiscrete(max_neg_a1_d), applyDiscrete(searchWidth));
-                int max_pos_a2 = std::min(applyDiscrete(max_pos_a2_d), applyDiscrete(searchWidth));
-                int max_neg_a2 = std::min(applyDiscrete(max_neg_a2_d), applyDiscrete(searchWidth));
-                int max_pos_a3 = std::min(applyDiscrete(max_pos_a3_d), applyDiscrete(searchWidth));
-                int max_neg_a3 = std::min(applyDiscrete(max_neg_a3_d), applyDiscrete(searchWidth));
-
-
-                std::array<std::vector<std::vector<bool>>, 3> flatQuadrats = {
-                  std::vector<std::vector<bool>>(max_pos_a1+max_neg_a1, std::vector<bool>(max_pos_a2+max_neg_a2, false)),
-                  std::vector<std::vector<bool>>(max_pos_a1+max_neg_a1, std::vector<bool>(max_pos_a3+max_neg_a3, false)),
-                  std::vector<std::vector<bool>>(max_pos_a2+max_neg_a2, std::vector<bool>(max_pos_a3+max_neg_a3, false))
-                };
-
-
-                const auto getMaxNeg{ [max_neg_a1, max_neg_a2, max_neg_a3](bool x_axis, int clIdx) -> int {
-                  if (x_axis) {
-                    return (clIdx==0) ? max_neg_a1:((clIdx==1) ? max_neg_a1:max_neg_a2);
-                  } else {
-                    return (clIdx==0) ? max_neg_a2:((clIdx==1) ? max_neg_a3:max_neg_a3);
-                  }
-                }};
-
-                const auto computeOccupationSimplifier{ [computeOccupation, getMaxNeg](int x, int y, int cl_idx, std::vector<std::vector<bool>>& flatQuadrat) -> double {
-                  return computeOccupation(((x < 0 ? x:0) + getMaxNeg(true, cl_idx)),
-                                    ((x < 0 ? 0:x) + getMaxNeg(true, cl_idx)),
-                                    ((y < 0 ? y:0) + getMaxNeg(false, cl_idx)),
-                                    ((y < 0 ? 0:y) + getMaxNeg(false, cl_idx)),
-                                           flatQuadrat);
-                }};
-
-                const auto computeOccupationReversedSimplifier{ [computeOccupation, getMaxNeg](int x, int y, int cl_idx, int reversedLen, std::vector<std::vector<bool>>& flatQuadrat) -> double {
-                  return (computeOccupation(((x < 0 ? 0:-reversedLen) + getMaxNeg(true, cl_idx)),
-                                            ((x < 0 ? reversedLen:0) + getMaxNeg(true, cl_idx)),
-                                            ((y < 0 ? y:0) + getMaxNeg(false, cl_idx)),
-                                            ((y < 0 ? 0:y) + getMaxNeg(false, cl_idx)),
-                                            flatQuadrat) +
-                          computeOccupation(((x < 0 ? x:0) + getMaxNeg(true, cl_idx)),
-                                            ((x < 0 ? 0:x) + getMaxNeg(true, cl_idx)),
-                                            ((y < 0 ? 0:-reversedLen) + getMaxNeg(false, cl_idx)),
-                                            ((y < 0 ? reversedLen:0) + getMaxNeg(false, cl_idx)),
-                                            flatQuadrat) +
-                          computeOccupation(((x < 0 ? 0:-reversedLen) + getMaxNeg(true, cl_idx)),
-                                            ((x < 0 ? reversedLen:0) + getMaxNeg(true, cl_idx)),
-                                            ((y < 0 ? 0:-reversedLen) + getMaxNeg(false, cl_idx)),
-                                            ((y < 0 ? reversedLen:0) + getMaxNeg(false, cl_idx)),
-                                            flatQuadrat)) / 3;
-                }};
-
-
-                for (int i23456 = 0; i23456 < 3; i23456++) {
-                  if (flatQuadrats[i23456].size() == 0) continue;
-
-                  std::vector<Eigen::Vector2d>& fP = (i23456==0) ? flatpointsC1:((i23456==1) ? flatpointsC2:flatpointsC3);
-                  double max_neg_1 = getMaxNeg(true, i23456);
-                  double max_neg_2 = getMaxNeg(false, i23456);
-
-                  for (Eigen::Vector2d& p1 : fP) {
-                    if (abs(p1[0]) < 0.05) continue; // ignore points very close to line, since it may not be exact
-                    if (abs(p1[1]) < 0.05) continue; // ignore points very close to line, since it may not be exact
-                    int idxX = ((int) std::floor((p1[0]) / arrowPiecesSize)) + max_neg_1;
-                    int idxY = ((int) std::floor((p1[1]) / arrowPiecesSize)) + max_neg_2;
-
-                    // We have no piece for this point (for example because we limit the searching-radius)
-                    if (idxX > flatQuadrats[i23456].size()-1 || idxY > flatQuadrats[i23456][0].size()-1) continue;
-
-                    flatQuadrats[i23456][idxX][idxY] = true;
-                  }
-                }
-
-
-                const auto printFlatQuadrants{ [getMaxNeg](const std::string& filename, std::vector<std::vector<bool>> flatQuadrat, bool shifted, double arrowPiecesSize, int clidx) -> void {
-                  std::vector<Eigen::Vector3d> vertices;
-                  std::vector<std::uint32_t> faces;
-
-                  std::uint32_t tracker = 0;
-                  int shifter_i = !shifted ? 0 : -getMaxNeg(true, clidx);
-                  int shifter_j = !shifted ? 0 : -getMaxNeg(false, clidx);
-                  for (int i = 0; i < flatQuadrat.size(); i++) {
-                    for (int j = 0; j < flatQuadrat[i].size(); j++) {
-                      if (!flatQuadrat[i][j]) continue;
-                      vertices.push_back({(shifter_i+i)*arrowPiecesSize, (shifter_j+j)*arrowPiecesSize, 0});
-                      vertices.push_back({(shifter_i+i)*arrowPiecesSize+arrowPiecesSize, (shifter_j+j)*arrowPiecesSize, 0});
-                      vertices.push_back({(shifter_i+i)*arrowPiecesSize+arrowPiecesSize, (shifter_j+j)*arrowPiecesSize+arrowPiecesSize, 0});
-                      vertices.push_back({(shifter_i+i)*arrowPiecesSize, (shifter_j+j)*arrowPiecesSize+arrowPiecesSize, 0});
-
-                      faces.push_back(tracker + 0);
-                      faces.push_back(tracker + 1);
-                      faces.push_back(tracker + 2);
-                      faces.push_back(tracker + 2);
-                      faces.push_back(tracker + 3);
-                      faces.push_back(tracker + 0);
-
-                      tracker+= 4;
-                    }
-                  }
-
-                  writePointsWithFaces(filename, vertices, faces);
-                }};
-                if (debugFracs) {
-                  printFlatQuadrants("output_DEBUG_FlatQ1_notShifted.ply", flatQuadrats[0], false, arrowPiecesSize, 0);
-                  printFlatQuadrants("output_DEBUG_FlatQ1_shifted.ply", flatQuadrats[0], true, arrowPiecesSize, 0);
-                  printFlatQuadrants("output_DEBUG_FlatQ2_notShifted.ply", flatQuadrats[1], false, arrowPiecesSize, 1);
-                  printFlatQuadrants("output_DEBUG_FlatQ2_shifted.ply", flatQuadrats[1], true, arrowPiecesSize, 1);
-                  printFlatQuadrants("output_DEBUG_FlatQ3_notShifted.ply", flatQuadrats[2], false, arrowPiecesSize, 2);
-                  printFlatQuadrants("output_DEBUG_FlatQ3_shifted.ply", flatQuadrats[2], true, arrowPiecesSize, 2);
-
-                }
-
-
-                const auto specialArrowDecInc{ [](int arrow_i) -> int {
-
-                  if (arrow_i < 0 && arrow_i >= -6) return arrow_i+1;
-                  if (arrow_i < -6 && arrow_i >= -12) return arrow_i+2;
-                  if (arrow_i < -12 && arrow_i >= -20) return arrow_i+4;
-                  if (arrow_i < -20 && arrow_i >= -36) return arrow_i+8;
-
-                  if (arrow_i >= 0 && arrow_i < 6) return arrow_i+1;
-                  if (arrow_i >= 6 && arrow_i < 12) return arrow_i+2;
-                  if (arrow_i >= 12 && arrow_i < 20) return arrow_i+4;
-                  if (arrow_i >= 20 && arrow_i < 36) return arrow_i+8;
-
-                  return arrow_i + 16;
-                }};
-
-
-
-
-                double min_inw_occ = 0.15;
-                double best_score = -1;
-                int best_a1 = 0;
-                int best_a2 = 0;
-                int best_a3 = 0;
-                bool bestIsInwards = false;
-                for (int a1_i = -max_neg_a1; a1_i <= max_pos_a1; a1_i = specialArrowDecInc(a1_i)) {
-                  if (a1_i == 0) continue;
-                  //if (a1_i == 1 || a1_i == -1) continue; // Don't allow very small arrows since there could be points just behind the intersection that
-                                                         // give a wrong impression and turn the arrow around.
-                                                         // If you need such small walls, consider adapting the score s.t. bigger walls have higher priority
-
-
-                  for (int a2_i = -max_neg_a2; a2_i <= max_pos_a2; a2_i = specialArrowDecInc(a2_i)) {
-                    if (a2_i == 0) continue;
-                    //if (a2_i == 1 || a2_i == -1) continue;
-
-                    // Fast forward C1_occup
-                    double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0, flatQuadrats[0]);
-                    if (C1_occup > 0 && C1_occup <= min_inw_occ) continue;
-
-                    int minForC1_revOcc = std::min(std::abs(a1_i), std::abs(a2_i));
-                    double C1_revOcc;
-                    if (C1_occup == 0) {
-                      C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0]);
-                      if (C1_revOcc <= 0.3) continue;
-                    }
-
-                    for (int a3_i = -max_neg_a3; a3_i <= max_pos_a3; a3_i = specialArrowDecInc(a3_i)) {
-                      if (a3_i == 0) continue;
-                      //if (a3_i == 1 || a3_i == -1) continue;
-
-                      double C2_occup = computeOccupationSimplifier(a1_i, a3_i, 1, flatQuadrats[1]);
-                      if (C2_occup > 0 && C2_occup <= min_inw_occ) continue; // Fast forwarding
-
-                      double C3_occup = computeOccupationSimplifier(a2_i, a3_i, 2, flatQuadrats[2]);
-                      //if (C3_occup > 0 && C3_occup <= 0.2) continue; // Fast forwarding // useless
-
-
-                      int minForC2_revOcc = std::min(std::abs(a1_i), std::abs(a3_i));
-                      int minForC3_revOcc = std::min(std::abs(a2_i), std::abs(a3_i));
-
-
-                      // We may allow one occupation to be almost 0
-                      // So iterate over occupations C1 to C3, if one is zero, calculate borders
-                      // TODO: Ignore this fact for now.
-                      double least_occ;
-                      bool inwards;
-                      if (C1_occup == 0 && C2_occup >= 0.3 && C3_occup >= 0.3) {
-                        //double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0]);
-
-
-                        least_occ = std::min(std::min(C1_revOcc, C2_occup), C3_occup);
-                        inwards = false;
-
-                      } else if (C1_occup >= 0.3 && C2_occup == 0 && C3_occup >= 0.3) {
-                        double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, minForC2_revOcc, flatQuadrats[1]);
-
-                        if (C2_revOcc <= 0.3) continue;
-
-                        least_occ = std::min(std::min(C1_occup, C2_revOcc), C3_occup);
-                        inwards = false;
-                      } else if (C1_occup >= 0.3 && C2_occup >= 0.3 && C3_occup == 0) {
-                        double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, minForC3_revOcc, flatQuadrats[2]);
-
-                        if (C3_revOcc <= 0.3) continue;
-
-                        least_occ = std::min(std::min(C1_occup, C2_occup), C3_revOcc);
-                        inwards = false;
-                      } else if (C1_occup >= min_inw_occ && C2_occup >= min_inw_occ && C3_occup >= min_inw_occ) {
-                        least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
-
-                        // Make sure the first 20cm are empty
-                        double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[0]);
-                        double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[1]);
-                        double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[2]);
-
-                        if (C1_revOcc > 0.2 || C2_revOcc > 0.2 || C3_revOcc > 0.2) continue;
-
-
-                        inwards = true;
-                      } else continue;
-
-
-
-                      //double least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
-                      double score = (std::sqrt(least_occ)*2) - 1;  // Sophisticated function that transforms occupation=0 to -1, occupation=1 to 1, and occupation~=0.3 to 0
-                      if (score > best_score) {
-                        best_a1 = a1_i;
-                        best_a2 = a2_i;
-                        best_a3 = a3_i;
-                        best_score = score;
-                        bestIsInwards = inwards;
-
-                        if (debugFracs) {
-                          std::cout << "Found new score: score: " << score << "arrows: " << best_a1 << "," << best_a2 << "," << best_a3 << "\n";
-                          std::cout << "occupations: " << C1_occup << "," << C2_occup << "," << C3_occup << "\n";
-                          std::cout << "occupations_from_to: " << C1_occup << "," << C2_occup << "," << C3_occup << "\n";
-                        }
-                      }
-                    }
-                  }
-                }
-
-                if (best_score <= 0) continue;
-
-                if (best_a1 < 0) edgeLine1 = -edgeLine1;
-                if (best_a2 < 0) edgeLine2 = -edgeLine2;
-                if (best_a3 < 0) edgeLine3 = -edgeLine3;
-
-                std::cout << "Found Arrow: " << k << "," << i << "," << j << ", idx: " << intersection_triangles.size() << "\n";
-
-                intersection_triangles.push_back(TriangleNode3D(
-                  k, i, j, cornerPoint, {edgeLine1, edgeLine2, edgeLine3}, {(std::abs(best_a1))*arrowPiecesSize, (std::abs(best_a2))*arrowPiecesSize, (std::abs(best_a3))*arrowPiecesSize}, bestIsInwards));
-              }
-            }
           }
         }
       }
@@ -1527,6 +1152,400 @@ bool recursiveBestCircle(const std::vector<TriangleNode3D>& iT,
   }
   return false;
 }
+
+    bool insideBB(BoundingBox& bb, Eigen::Vector3d& p) {
+      return p[0] >= bb.minX-0.1 && p[0] <= bb.maxX+0.1
+             && p[1] >= bb.minY-0.1 && p[1] <= bb.maxY+0.1
+             && p[2] >= bb.minZ-0.1 && p[2] <= bb.maxZ+0.1;
+    }
+    void intersect3ClustersForTriangle(int idxC1, int idxC2, int idxC3,
+                                  std::vector<Cluster>& clusters,
+                                  std::vector<TriangleNode3D>& intersection_triangles,
+                                  BoundingBox& bb) {
+      std::cout << "Intersection: " << idxC1 << "," << idxC2 << "," << idxC3 << "\n";
+
+      Eigen::Vector3d cornerPoint;
+      if (!RoomCReconstruction::intersect3Clusters(clusters[idxC1], clusters[idxC2],clusters[idxC3],cornerPoint)) return;
+      if (!insideBB(bb, cornerPoint)) return;
+
+      Cluster& c1 = clusters[idxC1];
+      Cluster& c2 = clusters[idxC2];
+      Cluster& c3 = clusters[idxC3];
+
+      // Make it run faster, we don't really need to intersect every closter with every other two
+      double dist_12 = c1.distanceToOtherCluster(c2);
+      double dist_13 = c1.distanceToOtherCluster(c3);
+      double dist_23 = c2.distanceToOtherCluster(c3);
+
+
+      if (dist_12 > min_req_closeness && dist_13 > min_req_closeness) return;  // If k is not a neighbor of either
+      if (dist_12 > min_req_closeness && dist_23 > min_req_closeness) return;  // If i is not a neighbor of either
+      if (dist_13 > min_req_closeness && dist_23 > min_req_closeness) return;  // If j is not a neighbor of either
+
+
+      Eigen::Vector3d edgeLine1;
+      Eigen::Vector3d edgeLine2;
+      Eigen::Vector3d edgeLine3;
+
+      // None of the if's should not happen. We got an intersection with 3 planes, so we should have all 3 edges. Note that we calculate the edgeLines here
+      if (!RoomCReconstruction::intersect2Clusters(c1, c2, edgeLine1)) { return; }
+      if (!RoomCReconstruction::intersect2Clusters(c1, c3, edgeLine2)) { return; }
+      if (!RoomCReconstruction::intersect2Clusters(c2, c3, edgeLine3)) { return; }
+
+      std::vector<Eigen::Vector2d> flatpointsC1 =
+        transformPlanePointsTo2D(cornerPoint, c1.normal, c1.pointsReal, edgeLine1, edgeLine2);
+      std::vector<Eigen::Vector2d> flatpointsC2 =
+        transformPlanePointsTo2D(cornerPoint, c2.normal, c2.pointsReal, edgeLine1, edgeLine3);
+      std::vector<Eigen::Vector2d> flatpointsC3 =
+        transformPlanePointsTo2D(cornerPoint, c3.normal, c3.pointsReal, edgeLine2, edgeLine3);
+
+
+      // For debugging
+      if (idxC1 == 0 && idxC2 == 1 && idxC3 == 26) {
+        debugFracs = true;
+
+        std::cout << "Trying Combination: i:" << idxC2 << ",j:" << idxC3
+                  << ",c1:" << idxC1 << ",c2:" << idxC2
+                  << ",c3:" << idxC3 << "\n";
+        writePoints("A_DEBUG_bla1.ply", simple2Dto3D(flatpointsC1));
+        writePoints("A_DEBUG_bla2.ply", simple2Dto3D(flatpointsC2));
+        writePoints("A_DEBUG_bla3.ply", simple2Dto3D(flatpointsC3));
+      } else {
+        debugFracs = false;
+      }
+
+
+      std::array<double, 4> boundC1 = calcBoundaries(flatpointsC1);
+      std::array<double, 4> boundC2 = calcBoundaries(flatpointsC2);
+      std::array<double, 4> boundC3 = calcBoundaries(flatpointsC3);
+
+
+      double arrowPiecesSize = 0.1;
+      double emptyRequirement = 0.1; // required empty space behind line, i.e. the minimum thickness of walls.
+      double searchWidth = 2;      // Searches in this radius for occpied pieces. So we can reconstruct occluded parts only within this distance.
+      // Can of course set to "infinity", the algorithm then uses just the cluster-boundaries. But is extremely slow.
+
+      double max_pos_a1_d = std::max(boundC1[0], boundC2[0]);
+      double max_neg_a1_d = std::max(boundC1[1], boundC2[1]);
+      double max_pos_a2_d = std::max(boundC1[2], boundC3[0]);
+      double max_neg_a2_d = std::max(boundC1[3], boundC3[1]);
+      double max_pos_a3_d = std::max(boundC2[2], boundC3[2]);
+      double max_neg_a3_d = std::max(boundC2[3], boundC3[3]);
+
+
+      const auto applyDiscrete{ [arrowPiecesSize](double len) -> int {
+        return std::ceil(len / arrowPiecesSize);
+      }};
+
+      std::array<int, 6> max_npA = {
+        std::min(applyDiscrete(max_pos_a1_d), applyDiscrete(searchWidth)),  // max_pos_a1
+        std::min(applyDiscrete(max_neg_a1_d), applyDiscrete(searchWidth)),  // max_neg_a1
+        std::min(applyDiscrete(max_pos_a2_d), applyDiscrete(searchWidth)),  // max_pos_a2
+        std::min(applyDiscrete(max_neg_a2_d), applyDiscrete(searchWidth)),  // max_neg_a2
+        std::min(applyDiscrete(max_pos_a3_d), applyDiscrete(searchWidth)),  // max_pos_a3
+        std::min(applyDiscrete(max_neg_a3_d), applyDiscrete(searchWidth))  // max_neg_a3
+      };
+
+
+
+
+      std::array<std::vector<std::vector<bool>>, 3> flatQuadrats = {
+        std::vector<std::vector<bool>>(max_npA[0]+max_npA[1], std::vector<bool>(max_npA[2]+max_npA[3], false)),
+        std::vector<std::vector<bool>>(max_npA[0]+max_npA[1], std::vector<bool>(max_npA[4]+max_npA[5], false)),
+        std::vector<std::vector<bool>>(max_npA[2]+max_npA[3], std::vector<bool>(max_npA[4]+max_npA[5], false))
+      };
+
+
+
+      for (int i23456 = 0; i23456 < 3; i23456++) {
+        if (flatQuadrats[i23456].size() == 0) continue;
+
+        std::vector<Eigen::Vector2d>& fP = (i23456==0) ? flatpointsC1:((i23456==1) ? flatpointsC2:flatpointsC3);
+        double max_neg_1 = max_npA[getNegArrInd(true, i23456)];
+        double max_neg_2 = max_npA[getNegArrInd(false, i23456)];
+
+        for (Eigen::Vector2d& p1 : fP) {
+          if (abs(p1[0]) < 0.05) continue; // ignore points very close to line, since it may not be exact
+          if (abs(p1[1]) < 0.05) continue; // ignore points very close to line, since it may not be exact
+          int idxX = ((int) std::floor((p1[0]) / arrowPiecesSize)) + max_neg_1;
+          int idxY = ((int) std::floor((p1[1]) / arrowPiecesSize)) + max_neg_2;
+
+          // We have no piece for this point (for example because we limit the searching-radius)
+          if (idxX > flatQuadrats[i23456].size()-1 || idxY > flatQuadrats[i23456][0].size()-1) continue;
+
+          flatQuadrats[i23456][idxX][idxY] = true;
+        }
+      }
+
+
+
+      if (debugFracs) {
+
+        printFlatQuadrants("output_DEBUG_FlatQ1_notShifted.ply", flatQuadrats[0], arrowPiecesSize, 0, 0);
+        printFlatQuadrants("output_DEBUG_FlatQ2_notShifted.ply", flatQuadrats[1], arrowPiecesSize, 0, 0);
+        printFlatQuadrants("output_DEBUG_FlatQ3_notShifted.ply", flatQuadrats[2], arrowPiecesSize, 0, 0);
+
+        printFlatQuadrants("output_DEBUG_FlatQ1_shifted.ply", flatQuadrats[0], arrowPiecesSize, -max_npA[getNegArrInd(true, 0)], -max_npA[getNegArrInd(false, 0)]);
+        printFlatQuadrants("output_DEBUG_FlatQ2_shifted.ply", flatQuadrats[1], arrowPiecesSize, -max_npA[getNegArrInd(true, 1)], -max_npA[getNegArrInd(false, 1)]);
+        printFlatQuadrants("output_DEBUG_FlatQ3_shifted.ply", flatQuadrats[2], arrowPiecesSize, -max_npA[getNegArrInd(true, 2)], -max_npA[getNegArrInd(false, 2)]);
+      }
+
+
+      double min_inw_occ = 0.15;
+      double best_score = -1;
+      int best_a1 = 0;
+      int best_a2 = 0;
+      int best_a3 = 0;
+      bool bestIsInwards = false;
+      for (int a1_i = -max_npA[1]; a1_i <= max_npA[0]; a1_i = specialArrowDecInc(a1_i)) {
+        if (a1_i == 0) continue;
+        //if (a1_i == 1 || a1_i == -1) continue; // Don't allow very small arrows since there could be points just behind the intersection that
+        // give a wrong impression and turn the arrow around.
+        // If you need such small walls, consider adapting the score s.t. bigger walls have higher priority
+
+
+        for (int a2_i = -max_npA[3]; a2_i <= max_npA[2]; a2_i = specialArrowDecInc(a2_i)) {
+          if (a2_i == 0) continue;
+          //if (a2_i == 1 || a2_i == -1) continue;
+
+          // Fast forward C1_occup
+          double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0, flatQuadrats[0], max_npA);
+          if (C1_occup > 0 && C1_occup <= min_inw_occ) continue;
+
+          int minForC1_revOcc = std::min(std::abs(a1_i), std::abs(a2_i));
+          double C1_revOcc;
+          if (C1_occup == 0) {
+            C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0], max_npA);
+            if (C1_revOcc <= 0.3) continue;
+          }
+
+          for (int a3_i = -max_npA[5]; a3_i <= max_npA[4]; a3_i = specialArrowDecInc(a3_i)) {
+            if (a3_i == 0) continue;
+            //if (a3_i == 1 || a3_i == -1) continue;
+
+            double C2_occup = computeOccupationSimplifier(a1_i, a3_i, 1, flatQuadrats[1], max_npA);
+            if (C2_occup > 0 && C2_occup <= min_inw_occ) continue; // Fast forwarding
+
+            double C3_occup = computeOccupationSimplifier(a2_i, a3_i, 2, flatQuadrats[2], max_npA);
+            //if (C3_occup > 0 && C3_occup <= 0.2) continue; // Fast forwarding // useless
+
+
+            int minForC2_revOcc = std::min(std::abs(a1_i), std::abs(a3_i));
+            int minForC3_revOcc = std::min(std::abs(a2_i), std::abs(a3_i));
+
+
+            // We may allow one occupation to be almost 0
+            // So iterate over occupations C1 to C3, if one is zero, calculate borders
+            // TODO: Ignore this fact for now.
+            double least_occ;
+            bool inwards;
+            if (C1_occup == 0 && C2_occup >= 0.3 && C3_occup >= 0.3) {
+              //double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0]);
+
+
+              least_occ = std::min(std::min(C1_revOcc, C2_occup), C3_occup);
+              inwards = false;
+
+            } else if (C1_occup >= 0.3 && C2_occup == 0 && C3_occup >= 0.3) {
+              double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, minForC2_revOcc, flatQuadrats[1], max_npA);
+
+              if (C2_revOcc <= 0.3) continue;
+
+              least_occ = std::min(std::min(C1_occup, C2_revOcc), C3_occup);
+              inwards = false;
+            } else if (C1_occup >= 0.3 && C2_occup >= 0.3 && C3_occup == 0) {
+              double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, minForC3_revOcc, flatQuadrats[2], max_npA);
+
+              if (C3_revOcc <= 0.3) continue;
+
+              least_occ = std::min(std::min(C1_occup, C2_occup), C3_revOcc);
+              inwards = false;
+            } else if (C1_occup >= min_inw_occ && C2_occup >= min_inw_occ && C3_occup >= min_inw_occ) {
+              least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
+
+              // Make sure the first 20cm are empty
+              double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[0], max_npA);
+              double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[1], max_npA);
+              double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[2], max_npA);
+
+              if (C1_revOcc > 0.2 || C2_revOcc > 0.2 || C3_revOcc > 0.2) continue;
+
+
+              inwards = true;
+            } else continue;
+
+
+
+            //double least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
+            double score = (std::sqrt(least_occ)*2) - 1;  // Sophisticated function that transforms occupation=0 to -1, occupation=1 to 1, and occupation~=0.3 to 0
+            if (score > best_score) {
+              best_a1 = a1_i;
+              best_a2 = a2_i;
+              best_a3 = a3_i;
+              best_score = score;
+              bestIsInwards = inwards;
+
+              if (debugFracs) {
+                std::cout << "Found new score: score: " << score << "arrows: " << best_a1 << "," << best_a2 << "," << best_a3 << "\n";
+                std::cout << "occupations: " << C1_occup << "," << C2_occup << "," << C3_occup << "\n";
+                std::cout << "occupations_from_to: " << C1_occup << "," << C2_occup << "," << C3_occup << "\n";
+              }
+            }
+          }
+        }
+      }
+
+      if (best_score <= 0) return;
+
+      if (best_a1 < 0) edgeLine1 = -edgeLine1;
+      if (best_a2 < 0) edgeLine2 = -edgeLine2;
+      if (best_a3 < 0) edgeLine3 = -edgeLine3;
+
+      std::cout << "Found Arrow: " << idxC1 << "," << idxC2 << "," << idxC3 << ", idx: " << intersection_triangles.size() << "\n";
+
+      intersection_triangles.push_back(TriangleNode3D(
+        idxC1, idxC2, idxC3, cornerPoint, {edgeLine1, edgeLine2, edgeLine3}, {(std::abs(best_a1))*arrowPiecesSize, (std::abs(best_a2))*arrowPiecesSize, (std::abs(best_a3))*arrowPiecesSize}, bestIsInwards));
+
+
+    }
+
+    std::array<double, 4> calcBoundaries(const std::vector<Eigen::Vector2d>& fP) {
+        double minX = 0; // Note that we all set to 0 instead of "max double".
+        double maxX = 0;
+        double minY = 0;
+        double maxY = 0;
+
+        for (Eigen::Vector2d p1 : fP) {
+          if (p1[0] < minX) { minX = p1[0]; }
+          if (p1[0] > maxX) { maxX = p1[0]; }
+          if (p1[1] < minY) { minY = p1[1]; }
+          if (p1[1] > maxY) { maxY = p1[1]; }
+        }
+
+        return {
+          maxX, std::abs(minX), maxY, std::abs(minY)
+        }; // maxX is 0 or greater, minX is 0 or smaller (so we use "abs" only on min's)
+      }
+
+      double computeOccupation(int min_i, int max_i, int min_j, int max_j, std::vector<std::vector<bool>> flatQuadrat) {
+
+        if ((max_i-min_i) < 1 || (max_j-min_j) < 1) {
+          std::cout << "computeOccError: distance is smaller than 1\n";
+        }
+
+        int summed = 0;
+        for (int i = min_i; i < max_i; i++) {
+          for (int j = min_j; j < max_j; j++) {
+            if (i < flatQuadrat.size() && j < flatQuadrat[i].size()) {  // If i or j is out of boundaries, assume there is an empty flatQ
+              if (flatQuadrat[i][j]) {
+                summed++;
+              }
+            }
+          }
+        }
+        return (double) summed / ((max_i-min_i) * (max_j-min_j));
+      }
+
+double computeOccupationSimplifier(int x2, int y, int cl_idx, std::vector<std::vector<bool>>& flatQuadrat, std::array<int, 6>& max_npA) {
+        return computeOccupation(((x2 < 0 ? x2:0) + max_npA[getNegArrInd(true, cl_idx)]),
+                                 ((x2 < 0 ? 0:x2) + max_npA[getNegArrInd(true, cl_idx)]),
+                                 ((y < 0 ? y:0) + max_npA[getNegArrInd(false, cl_idx)]),
+                                 ((y < 0 ? 0:y) + max_npA[getNegArrInd(false, cl_idx)]),
+                                 flatQuadrat);
+      };
+
+double computeOccupationReversedSimplifier(int x, int y, int cl_idx, int reversedLen, std::vector<std::vector<bool>>& flatQuadrat, std::array<int, 6>& max_npA) {
+        return (computeOccupation(((x < 0 ? 0:-reversedLen) + max_npA[getNegArrInd(true, cl_idx)]),
+                                  ((x < 0 ? reversedLen:0) + max_npA[getNegArrInd(true, cl_idx)]),
+                                  ((y < 0 ? y:0) + max_npA[getNegArrInd(false, cl_idx)]),
+                                  ((y < 0 ? 0:y) + max_npA[getNegArrInd(false, cl_idx)]),
+                                  flatQuadrat) +
+                computeOccupation(((x < 0 ? x:0) + max_npA[getNegArrInd(true, cl_idx)]),
+                                  ((x < 0 ? 0:x) + max_npA[getNegArrInd(true, cl_idx)]),
+                                  ((y < 0 ? 0:-reversedLen) + max_npA[getNegArrInd(false, cl_idx)]),
+                                  ((y < 0 ? reversedLen:0) + max_npA[getNegArrInd(false, cl_idx)]),
+                                  flatQuadrat) +
+                computeOccupation(((x < 0 ? 0:-reversedLen) + max_npA[getNegArrInd(true, cl_idx)]),
+                                  ((x < 0 ? reversedLen:0) + max_npA[getNegArrInd(true, cl_idx)]),
+                                  ((y < 0 ? 0:-reversedLen) + max_npA[getNegArrInd(false, cl_idx)]),
+                                  ((y < 0 ? reversedLen:0) + max_npA[getNegArrInd(false, cl_idx)]),
+                                  flatQuadrat)) / 3;
+      };
+
+
+    int getNegArrInd(bool x_axis, int clIdx) {
+      if (x_axis) {
+        return (clIdx==0) ? 1:((clIdx==1) ? 1:3);
+      } else {
+        return (clIdx==0) ? 3:((clIdx==1) ? 5:5);
+      }
+    };
+
+    void printFlatQuadrants(const std::string& filename, std::vector<std::vector<bool>> flatQuadrat, double arrowPiecesSize, int shift_x, int shift_y) {
+      std::vector<Eigen::Vector3d> vertices;
+      std::vector<std::uint32_t> faces;
+
+      std::uint32_t tracker = 0;
+
+      for (int i = 0; i < flatQuadrat.size(); i++) {
+        for (int j = 0; j < flatQuadrat[i].size(); j++) {
+          if (!flatQuadrat[i][j]) continue;
+          vertices.push_back({(shift_x +i)*arrowPiecesSize, (shift_y +j)*arrowPiecesSize, 0});
+          vertices.push_back({(shift_x +i)*arrowPiecesSize+arrowPiecesSize, (shift_y +j)*arrowPiecesSize, 0});
+          vertices.push_back({(shift_x +i)*arrowPiecesSize+arrowPiecesSize, (shift_y +j)*arrowPiecesSize+arrowPiecesSize, 0});
+          vertices.push_back({(shift_x +i)*arrowPiecesSize, (shift_y +j)*arrowPiecesSize+arrowPiecesSize, 0});
+
+          faces.push_back(tracker + 0);
+          faces.push_back(tracker + 1);
+          faces.push_back(tracker + 2);
+          faces.push_back(tracker + 2);
+          faces.push_back(tracker + 3);
+          faces.push_back(tracker + 0);
+
+          tracker+= 4;
+        }
+      }
+
+      writePointsWithFaces(filename, vertices, faces);
+    }
+    int specialArrowDecInc(int arrow_i) {
+
+      if (arrow_i < 0 && arrow_i >= -6) return arrow_i+1;
+      if (arrow_i < -6 && arrow_i >= -12) return arrow_i+2;
+      if (arrow_i < -12 && arrow_i >= -20) return arrow_i+4;
+      if (arrow_i < -20 && arrow_i >= -36) return arrow_i+8;
+
+      if (arrow_i >= 0 && arrow_i < 6) return arrow_i+1;
+      if (arrow_i >= 6 && arrow_i < 12) return arrow_i+2;
+      if (arrow_i >= 12 && arrow_i < 20) return arrow_i+4;
+      if (arrow_i >= 20 && arrow_i < 36) return arrow_i+8;
+
+      return arrow_i + 16;
+    };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     std::vector<Cluster> divideIntoSeparateClusters(const Cluster& cluster) {
