@@ -16,9 +16,6 @@
 
 namespace RoomCReconstruction {
 
-    constexpr std::size_t CLUSTER_CONTOUR_K_SAMPLES = 120;
-
-    constexpr double minwalldistance = 0.1; // 10cm
 
 
     struct BoundingBox {
@@ -29,26 +26,17 @@ namespace RoomCReconstruction {
         double maxY = std::numeric_limits<double>::min();
         double maxZ = std::numeric_limits<double>::min();
     };
-
-    class ClusterContour {
-    public:
-        std::vector <size_t> contourPoints;
-
-
-        void addContourPoint(size_t pointIndex) {
-            // Make sure we don't add the same point twice in a row s.t. we can create a discrete curve with the points later on.
-            if (contourPoints.size() == 0 || (contourPoints[contourPoints.size() - 1] != pointIndex && contourPoints[0] != pointIndex)) {
-                contourPoints.push_back(pointIndex);
-            }
-        }
-
-
+    struct MergingReq {
+      double angleFracMerging;
+      double distMerging;
+      double reqPoints;
+      bool requireCloseness;
     };
+
 
     class Cluster {
     public:
         Eigen::Vector3d normal;
-        double gaussianDistance;
         Eigen::Vector3d center;
 
         std::array<unsigned char, 3> color;
@@ -62,9 +50,6 @@ namespace RoomCReconstruction {
 
 
         bool mergedCluster = false;
-        double max_distance;
-
-        std::vector <Eigen::Vector3d> intersectionsPoints;
 
         std::vector<std::array<int, 3>> supportiveCubes;
 
@@ -95,9 +80,6 @@ namespace RoomCReconstruction {
         bool checkDistCloseEnough(Eigen::Vector3d& point, double& dist_param) {
           dist_param = distanceToClusterFromMarker(point);
           return dist_param <= 0.5;
-          /*if (distToCluster > 0.5) return false;
-          if (distToCluster > 0.1) markerPoints.push_back(point); // Between 0.1 and 0.5 add marker
-          return true;*/
         }
 
         bool checkAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, double dist, double angle_frac, double& dist_param) {
@@ -116,10 +98,6 @@ namespace RoomCReconstruction {
           updateCenter(point);
           updateNormal(pointNormal);
         }
-      void AddNoNormal(Eigen::Vector3d point, size_t pointIndex) {
-        points.push_back(pointIndex);
-        pointsReal.push_back(point);
-      }
 
         bool checkAndAdd(Eigen::Vector3d point, Eigen::Vector3d pointNormal, double dist, double angle_frac, size_t pointIndex, bool requireCloseness) {
           double dist_param = requireCloseness ? 0:-1;
@@ -138,18 +116,14 @@ namespace RoomCReconstruction {
 
 
 
-
         void updateCenter(Eigen::Vector3d newPoint) {
           center = (center * (points.size() - 1) + newPoint) / points.size();
-            //std::cout << "Center is now: " << "[" << center.x() << "," << center.y() << "," << center.z() << "]" << "\n";
-
         }
 
         void updateNormal(Eigen::Vector3d newNormal) {
             normal = (normal * (points.size() - 1) + newNormal) / points.size();
 
             //normal = (((normal * addedPointsWeigths) + (newNormal*weight)) / points.size()).normalized();
-            //std::cout << "Center is now: " << "[" << center.x() << "," << center.y() << "," << center.z() << "]" << "\n";
         }
 
 
@@ -176,20 +150,10 @@ namespace RoomCReconstruction {
 
 
 
-        double calculateClosestDistanceToCluster(Eigen::Vector3d vec) {
-            double mindistance = std::numeric_limits<double>::max();
-            for (int i = 0; i < points.size(); i++) {
-                double dist = calcDistance(vec, pointsReal[i]);
-                if (dist < mindistance) { mindistance = dist; }
-            }
-            return mindistance;
-        }
-
 
         void tryMergeCluster(Cluster& toMergeCluster, double dist, double angle_frac, double reqPercent, bool requireCloseness) {
           double unnec_dist_p = -1;
-          // TODO: USE DIST PARAM WHEN ADDING POINTS
-            if (requireCloseness && distanceToOtherCluster(toMergeCluster) > 0.5) return;
+          if (requireCloseness && distanceToOtherCluster(toMergeCluster) > 0.5) return;
           if (reqPercent == 0) {
 
             if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac, unnec_dist_p)) {
@@ -210,9 +174,7 @@ namespace RoomCReconstruction {
               toMergeCluster.mergedCluster = true;
             }
 
-
           } else {
-
 
             int possibleMergePoints = 0;
             for (int i = 0; i < toMergeCluster.points.size(); i++) {
@@ -225,8 +187,10 @@ namespace RoomCReconstruction {
             if (possibleMergePoints / toMergeCluster.points.size() >= reqPercent) {
               for (int i = 0; i < toMergeCluster.points.size(); i++) {
                 if(checkAdd(toMergeCluster.center, toMergeCluster.normal, dist, angle_frac, unnec_dist_p)) {
+                  //Todo: Consider adding without normal
                   Add(toMergeCluster.pointsReal[i], toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
                 } else if(checkAdd(toMergeCluster.center, -toMergeCluster.normal, dist, angle_frac, unnec_dist_p)) {
+                  //Todo: Consider adding without normal
                   Add(toMergeCluster.pointsReal[i], -toMergeCluster.pointsNormals[i], toMergeCluster.points[i]);
                 }
               }
@@ -234,25 +198,7 @@ namespace RoomCReconstruction {
               toMergeCluster.mergedCluster = true;
             }
           }
-
-
         }
-
-      /*void tryAbsorbCluster(Cluster& toAbsorbCluster, double dist, double absorbPercent) {
-
-        int possibleAbsorbsions = 0;
-        for (int i = 0; i < toAbsorbCluster.points.size(); i++) {
-          if(checkAddNoNormal(toAbsorbCluster.pointsReal[i], dist)) {
-            possibleAbsorbsions++;
-          }
-        }
-        if (possibleAbsorbsions / toAbsorbCluster.points.size() >= absorbPercent) {
-          for (int i = 0; i < toAbsorbCluster.points.size(); i++) {
-            AddNoNormal(toAbsorbCluster.pointsReal[i], toAbsorbCluster.points[i]); // Note: Normal is likely to be off. Just add for supportive
-          }
-          toAbsorbCluster.mergedCluster = true;
-        }
-      }*/
 
       void addSupportiveRoomCube(int x, int y, int z) {
         // Check if we already have this supportive cube
@@ -265,7 +211,6 @@ namespace RoomCReconstruction {
         // We don't have it, so add it
         supportiveCubes.push_back({x,y,z});
       }
-
 
     };
 

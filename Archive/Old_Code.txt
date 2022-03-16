@@ -285,6 +285,24 @@
 
     // Code in wallextender.hpp
 
+    constexpr std::size_t CLUSTER_CONTOUR_K_SAMPLES = 120;
+        class ClusterContour {
+        public:
+            std::vector <size_t> contourPoints;
+
+
+            void addContourPoint(size_t pointIndex) {
+                // Make sure we don't add the same point twice in a row s.t. we can create a discrete curve with the points later on.
+                if (contourPoints.size() == 0 || (contourPoints[contourPoints.size() - 1] != pointIndex && contourPoints[0] != pointIndex)) {
+                    contourPoints.push_back(pointIndex);
+                }
+            }
+
+
+        };
+
+
+
     class RecursiveRectangle {
     public:
       enum fillState {notDetermined, special, notFilled, filled};

@@ -155,7 +155,6 @@ struct ExtStr2 {
       chosen[es.opposingArrow] = -1;
     }
 
-    // Todo: Only positive distances, don't allow sth. like this:   <----.   .-----> to match, only .--->  <----.
     void findPossibleFollowers(const std::vector<TriangleNode3D>& allTriangles, int myIdx) {
 
       for (int i = 0; i < allTriangles.size(); i++) {
@@ -165,8 +164,8 @@ struct ExtStr2 {
         int myArrowIdx, followingArrayIdx;
         if (hasTwoSimilarClusters(t, myArrowIdx, followingArrayIdx)) {
           if (this->arrows[myArrowIdx] != t.arrows[followingArrayIdx] && this->arrows[myArrowIdx] != -t.arrows[followingArrayIdx]) { // Todo: make an assertion
-            std::cout << "ERROR12345\n";
-            continue;
+            std::cout << "ERROR: Two triangles which intersect two same planes don't have the same arrow-direction.\n";
+            exit(0);
           } else {
             if (this->arrows[myArrowIdx] == -t.arrows[followingArrayIdx]) { // Two opposing arrows
               // Check if arrows are opposing like --->   <---, and not <---  ---->
@@ -180,13 +179,10 @@ struct ExtStr2 {
 
                 possibilites[myArrowIdx].push_back({myIdx, i, (t.corner - this->corner).norm(), inventedLen, myArrowIdx, followingArrayIdx});
               }
-
             }
           }
         }
       }
-
-
     }
 
 
@@ -377,9 +373,4 @@ struct ExtStr2 {
   };
 
 
-
-
-
-
-std::vector<ExtStr> findPossibleExtensions(const std::vector<TriangleNode3D>& iT, const std::vector<int>& excluded, const int& from);
 }

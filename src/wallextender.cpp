@@ -8,7 +8,6 @@
 
 #include <cmath>
 #include <iostream>
-#include <algorithm>
 
 
 namespace RoomCReconstruction {
@@ -72,7 +71,7 @@ namespace RoomCReconstruction {
           if (((double)i / local_pcas.size()) * 100 >= (debugPercent + 1)) {
             std::cout << (++debugPercent) << "%, " << clusters.size() << " clusters found\n";
 
-            // printPointsWRTClusters("./video/A_video_step1_" + formatInteger(i, 12)  + ".ply", points, clusters, colors);
+            // printPointsWRTClusters("./video_A_video_step1_" + formatInteger(i, 12)  + ".ply", points, clusters, colors);
           }
 
           const double ev_sum{ local_pcas[i].eigenvalues.sum() };
@@ -139,14 +138,13 @@ namespace RoomCReconstruction {
             }
 
             clusters.push_back(newCluster);
-            // i--;   //Makes that we process the same point again s.t. we can add it to the new cluster.
           }
 
           // Prepare next queue-members
-          for (int xyz123 = 0; xyz123 < ret_indexes.size(); xyz123++) {
-            if (!addedPoints[xyz123]) {
-              pointQueue.push(xyz123);
-              addedPoints[xyz123] = true;
+          for (int neighbor_i = 0; neighbor_i < ret_indexes.size(); neighbor_i++) {
+            if (!addedPoints[neighbor_i]) {
+              pointQueue.push(neighbor_i);
+              addedPoints[neighbor_i] = true;
             }
           }
 
@@ -157,20 +155,17 @@ namespace RoomCReconstruction {
 
         std::cout << "Found " << clusters.size() << " Clusters\n";
 
-
+      // Code for coloring clusters according to their index for easier debugging.
+      // It works for around 65'000 clusters, in contrast to the easier coloring further down
+      // which only works for 255 clusters
       /*for (int i = 0; i < clusters.size(); i++) {
         clusters[i].color[1] = std::floor(i / 255);
         clusters[i].color[2] = i % 255;
       }*/
-      printPointsWRTClusters("output_clustering_000.ply", points, clusters, colors);
+      printPointsWRTClusters("output_clustering_1_initial.ply", points, clusters, colors);
 
 
-        /*for (int i = 0; i < clusters.size(); i++) {
-            std::cout << "Cluster " << i << ": #points: " << clusters[i].points.size();
-        }*/
-
-
-
+      // For debugging, you can mark the clusters you want to inspect with a specific color
       /*for (int i = 0; i < clusters.size(); i++) {
         if ((std::floor(i / 255) == 0) && (i % 255 == 126)) {
           clusters[i].color = colorRed;
@@ -180,17 +175,9 @@ namespace RoomCReconstruction {
           clusters[i].color = colorBlack;
         }
       }
-      printPointsWRTClusters("output_clustering_KEYCLUSTER.ply", points, clusters, colors);*/
+      printPointsWRTClusters("output_clustering_DEBUG_KEYCLUSTER.ply", points, clusters, colors);*/
 
 
-
-
-      struct MergingReq {
-        double angleFracMerging;
-        double distMerging;
-        double reqPoints;
-        bool requireCloseness;
-      };
 
 
       std::vector<MergingReq> mergingQueue = {{req_angle, 0.1, 0, true},                        // Merges close similar clusters
@@ -199,7 +186,7 @@ namespace RoomCReconstruction {
                                                                                                                                  // Need to be quite exact, otherwise we are possibly going to merge wall+furniture, slightly change the walls normal and then arrow-finding is less exact and may even get wrong arrows
 
 
-      bool stillmerging = true;
+      bool stillmerging;
       int video_mergingCounter = 0;
       for (MergingReq mergReq : mergingQueue) {
         std::cout << "distMerging: " << mergReq.distMerging << "\n";
@@ -223,7 +210,7 @@ namespace RoomCReconstruction {
             }
           }
         }
-        printPointsWRTClusters("./video/A_video_step2_" + formatInteger(video_mergingCounter++, 12)  + ".ply", points, clusters, colors);
+        printPointsWRTClusters("./video_A_video_step2_" + formatInteger(video_mergingCounter++, 12)  + ".ply", points, clusters, colors);
       }
 
       std::cout << clusters.size() << " Clusters after merging\n";
@@ -239,7 +226,7 @@ namespace RoomCReconstruction {
       }
 
       std::cout << clusters.size() << " Clusters after removing small ones\n";
-      printPointsWRTClusters("output_clustering_1_after_removingSmallones.ply", points, clusters, colors);
+      printPointsWRTClusters("output_clustering_3_after_removingSmallones.ply", points, clusters, colors);
 
 
 
@@ -249,35 +236,14 @@ namespace RoomCReconstruction {
       for (int i = 0; i < clusters.size(); i++) {
         clusters[i].color[2] = i;
       }
-      printPointsWRTClusters("output_clustering_0_MAIN.ply", points, clusters, colors);
+      printPointsWRTClusters("output_clustering_4_MAIN_with_colors_accoring_to_indexes.ply", points, clusters, colors);
 
 
       std::vector<Eigen::Vector3d> verticesMarker;
       for (int mark_i = 0; mark_i < clusters.size(); mark_i++) {
         verticesMarker.insert(verticesMarker.end(), clusters[mark_i].markerPoints.begin(), clusters[mark_i].markerPoints.end());
       }
-      writePoints("output_clustering_MARKER.ply", verticesMarker);
-
-
-
-      /*std::cout << "Adding remaining points to clusters as supportive ones, ";
-      double debugPercent2 = 0;
-      // For all points
-      for (int i = 0; i != local_pcas.size(); ++i) {
-        if (((double)i / local_pcas.size()) * 1000 >= (debugPercent2 + 0.1)) {
-          std::cout << "Percent: " << (++debugPercent2) / 10 << "%\n";
-        }
-        if (colors[i] == colorBlack) {
-          for (Cluster c : clusters) {
-            if (c.checkAddNoNormal(points.col(static_cast<Eigen::Index>(i)), 0.08)) {
-              c.AddNoNormal(points.col(static_cast<Eigen::Index>(i)), i);
-            }
-          }
-        }
-      }*/
-
-
-
+      writePoints("output_clustering_5_markerPoints.ply", verticesMarker);
 
 
 
@@ -305,7 +271,8 @@ namespace RoomCReconstruction {
       int rCZ = std::ceil((roomDistZ) / cubesSize);
 
       std::cout << "Generating Cubes... " << rCX << "," << rCY << "," << rCZ << "\n";
-      std::vector<std::vector<std::vector<RoomCube>>> roomCubes123(rCX,
+
+      /*std::vector<std::vector<std::vector<RoomCube>>> roomCubes123(rCX,
                                                                    std::vector<std::vector<RoomCube>>(rCY,
                                                                                                       std::vector<RoomCube>(rCZ) ));
       for (double xIter = 0; xIter < rCX; xIter+=cubesSize) {
@@ -316,7 +283,8 @@ namespace RoomCReconstruction {
             roomCubes123[xIter][yIter][zIter].init(bb.minX+xIter*cubesSize, bb.minY+yIter*cubesSize, bb.minZ+zIter*cubesSize, cubesSize);
           }
         }
-      }
+      }*/
+
 /*
       std::cout << "Add points to Cubes...\n";
 
@@ -372,10 +340,6 @@ namespace RoomCReconstruction {
 
       //writePointsWithFaces("A_Cubes.ply", vertices, faces);
 
-      int counter = 0;
-      std::vector<Eigen::Vector3d> corners;
-      std::vector<std::array<unsigned char, 3>> cornerColors;
-
       std::vector<TriangleNode3D> intersection_triangles;
 
       std::chrono::steady_clock::time_point time_measure = std::chrono::high_resolution_clock::now();
@@ -397,7 +361,7 @@ namespace RoomCReconstruction {
 
 
       printArrows("output_clustering_6_arrows.ply", 0, false, intersection_triangles);
-
+      printArrows("output_clustering_7_arrows_small.ply", 0.1, false, intersection_triangles);
 
 
 
@@ -416,8 +380,8 @@ namespace RoomCReconstruction {
       std::cout << "\n";
 
 
-      printArrows("output_clustering_7_arrows_linked.ply", 0, true, intersection_triangles);
-      printArrows("output_clustering_8_arrows_linked_small.ply", 0.1, true, intersection_triangles);
+      printArrows("output_clustering_8_arrows_linked.ply", 0, true, intersection_triangles);
+      printArrows("output_clustering_9_arrows_linked_small.ply", 0.1, true, intersection_triangles);
 
 
       std::cout << "Printing triangles:\n";
@@ -448,8 +412,8 @@ namespace RoomCReconstruction {
 
 
 
-          std::vector<Eigen::Vector3d> vertices123;
-          std::vector<std::uint32_t> faces123;
+          std::vector<Eigen::Vector3d> vertices_room;
+          std::vector<std::uint32_t> faces_room;
           for (ClusterPolygon cp : polygons) {
             std::cout << "Cidx: " << cp.idxCluster << "\n";
             std::vector<Eigen::Vector3d> c_pnts;
@@ -473,11 +437,11 @@ namespace RoomCReconstruction {
             std::cout << ", tempPnts-size: " << tempPnts.size();
             earClippingPolygon(tempPnts, facesTT);
             std::cout << ", FacesTT-size: " << facesTT.size();
-            appendVerticesFaces(vertices123, faces123, c_pnts, facesTT);
-            std::cout << ", Faces123-size: " << faces123.size() << "\n";
+            appendVerticesFaces(vertices_room, faces_room, c_pnts, facesTT);
+            std::cout << ", FacesRoom-size: " << faces_room.size() << "\n";
           }
 
-          writePointsWithFaces("A_NEWRoom.ply", vertices123, faces123);
+          writePointsWithFaces("A_NEWRoom.ply", vertices_room, faces_room);
           break;
         } else {
           std::cout << "Didn't find anything :(\n";
@@ -487,27 +451,14 @@ namespace RoomCReconstruction {
             t.chosen[2] = -1;
           }
         }
-
-        /*std::vector<ExtStr> resArr123456 = findPossibleExtensions(intersection_triangles, exc, jj);
-        for (ExtStr e1234 : resArr123456) {
-          std::cout << "resArr_" << std::to_string(jj) << ": " << e1234.intersectionIdx << ", " << e1234.dist << "," << e1234.myArrow << ", " << e1234.opposingArrow << "\n";
-        }*/
       }
-
-
-
-
-
-      writePointsWColors("output_clustering_5_cornerPoints.ply", corners, cornerColors);
-
     }
 
 
 
     // Returns true if worked
     bool
-    intersect3Clusters(Cluster c1, Cluster c2, Cluster c3, Eigen::Vector3d& resultPoint)
-    {
+    intersect3Clusters(Cluster c1, Cluster c2, Cluster c3, Eigen::Vector3d& resultPoint) {
       Eigen::Vector3d u = c2.normal.cross(c3.normal);
       double denom = c1.normal.dot(u);
       if (std::abs(denom) < DBL_EPSILON)
@@ -526,8 +477,6 @@ namespace RoomCReconstruction {
       direction = c1.normal.cross(c2.normal);
       return !(direction.dot(direction) < DBL_EPSILON);
     }
-
-
 
 
 
@@ -567,20 +516,17 @@ namespace RoomCReconstruction {
         Eigen::Vector3d D = -a2;
         Eigen::Vector3d P = pnts[i];
 
-        double x123 = ((V-P).dot(N)) / N.dot(D);
+        double x_projected = ((V-P).dot(N)) / N.dot(D);
 
         Eigen::Vector3d N2 = a2.cross(normal);
         Eigen::Vector3d V2 = center;
         Eigen::Vector3d D2 = -a1;
         Eigen::Vector3d P2 = pnts[i];
 
-        double y123 = ((V2-P2).dot(N2)) / N2.dot(D2);
+        double y_projected = ((V2-P2).dot(N2)) / N2.dot(D2);
 
-        points2D.emplace_back(Eigen::Vector2d{y123, x123});
+        points2D.emplace_back(Eigen::Vector2d{ y_projected, x_projected });
       }
-
-      //Debug
-      //write2Dpoints("transform_3d_2d_debug.ply", points2D);
 
       return points2D;
     }
@@ -681,8 +627,6 @@ namespace RoomCReconstruction {
       };
 
 
-
-
       std::array<std::vector<std::vector<bool>>, 3> flatQuadrats = {
         std::vector<std::vector<bool>>(max_npA[0]+max_npA[1], std::vector<bool>(max_npA[2]+max_npA[3], false)),
         std::vector<std::vector<bool>>(max_npA[0]+max_npA[1], std::vector<bool>(max_npA[4]+max_npA[5], false)),
@@ -690,13 +634,12 @@ namespace RoomCReconstruction {
       };
 
 
+      for (int clIdx = 0; clIdx < 3; clIdx++) {
+        if (flatQuadrats[clIdx].size() == 0) continue;
 
-      for (int i23456 = 0; i23456 < 3; i23456++) {
-        if (flatQuadrats[i23456].size() == 0) continue;
-
-        std::vector<Eigen::Vector2d>& fP = (i23456==0) ? flatpointsC1:((i23456==1) ? flatpointsC2:flatpointsC3);
-        double max_neg_1 = max_npA[getNegArrInd(true, i23456)];
-        double max_neg_2 = max_npA[getNegArrInd(false, i23456)];
+        std::vector<Eigen::Vector2d>& fP = (clIdx ==0) ? flatpointsC1:((clIdx ==1) ? flatpointsC2:flatpointsC3);
+        double max_neg_1 = max_npA[getNegArrInd(true, clIdx)];
+        double max_neg_2 = max_npA[getNegArrInd(false, clIdx)];
 
         for (Eigen::Vector2d& p1 : fP) {
           if (abs(p1[0]) < 0.05) continue; // ignore points very close to line, since it may not be exact
@@ -705,16 +648,14 @@ namespace RoomCReconstruction {
           int idxY = ((int) std::floor((p1[1]) / arrowPiecesSize)) + max_neg_2;
 
           // We have no piece for this point (for example because we limit the searching-radius)
-          if (idxX > flatQuadrats[i23456].size()-1 || idxY > flatQuadrats[i23456][0].size()-1) continue;
+          if (idxX > flatQuadrats[clIdx].size()-1 || idxY > flatQuadrats[clIdx][0].size()-1) continue;
 
-          flatQuadrats[i23456][idxX][idxY] = true;
+          flatQuadrats[clIdx][idxX][idxY] = true;
         }
       }
 
 
-
       if (debugFracs) {
-
         printFlatQuadrants("output_DEBUG_FlatQ1_notShifted.ply", flatQuadrats[0], arrowPiecesSize, 0, 0);
         printFlatQuadrants("output_DEBUG_FlatQ2_notShifted.ply", flatQuadrats[1], arrowPiecesSize, 0, 0);
         printFlatQuadrants("output_DEBUG_FlatQ3_notShifted.ply", flatQuadrats[2], arrowPiecesSize, 0, 0);
@@ -768,14 +709,10 @@ namespace RoomCReconstruction {
             int minForC3_revOcc = std::min(std::abs(a2_i), std::abs(a3_i));
 
 
-            // We may allow one occupation to be almost 0
-            // So iterate over occupations C1 to C3, if one is zero, calculate borders
-            // TODO: Ignore this fact for now.
             double least_occ;
             bool inwards;
             if (C1_occup == 0 && C2_occup >= 0.3 && C3_occup >= 0.3) {
               //double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0]);
-
 
               least_occ = std::min(std::min(C1_revOcc, C2_occup), C3_occup);
               inwards = false;
@@ -803,7 +740,6 @@ namespace RoomCReconstruction {
               double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[2], max_npA);
 
               if (C1_revOcc > 0.2 || C2_revOcc > 0.2 || C3_revOcc > 0.2) continue;
-
 
               inwards = true;
             } else continue;
@@ -839,7 +775,6 @@ namespace RoomCReconstruction {
 
       intersection_triangles.push_back(TriangleNode3D(
         idxC1, idxC2, idxC3, cornerPoint, {edgeLine1, edgeLine2, edgeLine3}, {(std::abs(best_a1))*arrowPiecesSize, (std::abs(best_a2))*arrowPiecesSize, (std::abs(best_a3))*arrowPiecesSize}, bestIsInwards));
-
 
     }
 
