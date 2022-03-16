@@ -740,3 +740,21 @@ if (suggestionArrow3 < 0.5) {edgeLine3 = -edgeLine3;}
 
 
 
+
+
+
+
+// Oldest way for arrow-calculation
+// It just look on which quadrant the most points are
+void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::Vector3d arrow, std::array<int, 2> res) {
+      std::vector<Eigen::Vector2d> flatpointsC1 = transformPlanePointsTo2D(corner, c1.normal, c1.pointsReal, arrow, rotateAround(arrow, c1.normal));
+      std::vector<Eigen::Vector2d> flatpointsC2 = transformPlanePointsTo2D(corner, c2.normal, c2.pointsReal, arrow, rotateAround(arrow, c2.normal));
+
+      for (Eigen::Vector2d p : flatpointsC1) {
+        if (p[1] > 0) {res[0]++;} else {res[1]++;}
+      }
+      for (Eigen::Vector2d p : flatpointsC2) {
+        if (p[1] > 0) {res[0]++;} else {res[1]++;}
+      }
+    }
+void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::Vector3d arrow, std::array<int, 2> res); // In .hpp

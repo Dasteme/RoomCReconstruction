@@ -1,0 +1,139 @@
+// This file contains old code for the triangle-recursion.
+
+
+// The following lines are from an old approach which first tried to get a circle around the floor and then recursively build up the room.
+// The code was abandoned because there might be multiple possible circles for the floor. If the first one is taken, and then later on there
+// is no circle anymore for a given wall (maybe because its furniture), everything has to be undone. This is very hard to keep track of
+// if the recursion doesn't work in the 3-dimensional space. The new approach works in 3 dimension and doesn't even require the floor-cluster.
+// Note: The code is not complete, since part of the code were used and modified for the new 3-dimensional approach.
+
+
+      // Start from floor. Requires a horizontal floor.
+      double floorLevel = std::numeric_limits<double>::max();
+      int idxFloorCluster = -1;
+
+      // Find floor-cluster
+      for (int i = 0; i < clusters.size(); i++) {
+
+        Eigen::Vector3d floorNormalAssumption{0, 0, 1};
+        double angle = safe_acos(clusters[i].normal.dot(floorNormalAssumption) / (clusters[i].normal.norm() * floorNormalAssumption.norm()));
+        double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 8);
+        if (gaussian_angle > 0.5) {
+          if (clusters[i].center[2] < floorLevel) {
+            idxFloorCluster = i;
+            floorLevel = clusters[i].center[2];
+          }
+        }
+      }
+
+      // Find possible wallclusters
+      std::vector<int> wallClusterIndices;
+      for (int i = 0; i < clusters.size(); i++) {
+        if (checkSomewhatOrthogonal(clusters[idxFloorCluster], clusters[i])) {
+          std::cout << "Supportive Size:" << clusters[i].supportiveCubes.size() << "\n";
+          wallClusterIndices.push_back(i);
+        }
+      }
+
+
+  std::vector<int> exc;
+
+  const auto findFirstNotExcl{[](std::vector<TriangleNode3D> intersection_triangles, std::vector<int> exc) -> int {
+    std::cout << "Exclusions: \n";
+    for (int iii : exc) {
+      std::cout << std::to_string(iii) << ", ";
+    }
+    std::cout << "\n";
+    for (int i = 0; i < intersection_triangles.size(); i++) {
+      if (std::find(exc.begin(), exc.end(), i) == exc.end()) {
+        return i;
+      }
+    }
+    return -1;
+  }};
+
+  int cur = findFirstNotExcl(intersection_triangles, exc);
+  while (cur != -1) {
+    std::vector<int> circle;
+    circle.push_back(cur);
+    std::cout << "trying tri: " << cur << "\n";
+    bool recSucc = recursiveBestCircle(intersection_triangles, exc, circle, 1);
+    std::cout << "RecSucc: " << recSucc << "\n";
+    if (!recSucc) {
+      exc.push_back(cur);
+      cur = findFirstNotExcl(intersection_triangles, exc);
+    } else {
+      std::cout << "Found Rec: \n";
+      for (int iii : circle) {
+        std::cout << std::to_string(iii) << ", ";
+      }
+      std::cout << "\n";
+      for (int t : circle) {
+        exc.push_back(t);
+      }
+      cur = findFirstNotExcl(intersection_triangles, exc);
+    }
+  }
+
+
+
+ // This part prints out a graph representation for the 2-dimensional triangles.
+ // It is based on the idea that the intersections of triangles in 2d can be shown as a graph.
+ // Then we could use an algorithm for graphs to get closed circles.
+
+//std::vector<std::vector<double>> graphRepresentation(intersection_triangles.size(), std::vector<double>(intersection_triangles.size(), 0));
+
+
+for (int ttt1 = 0; ttt1 < graphRepresentation.size(); ttt1++) {
+  for (int ttt2 = 0; ttt2 < graphRepresentation.size(); ttt2++) {
+    std::cout << (graphRepresentation[ttt1][ttt2] == 0 ? "_":std::to_string(graphRepresentation[ttt1][ttt2]));
+  }
+  std::cout << "\n";
+}
+
+
+
+
+
+
+
+
+// Recursively looks for new circle-members. Always tries to append triangle with smallest distance. Looks in searchDir
+bool recursiveBestCircle(const std::vector<TriangleNode3D>& iT,
+                         const std::vector<int>& exc,
+                         std::vector<int>& circle,
+                         const int& searchingDir) {
+  /*std::cout << "Recursion: ";
+  for (int iii : circle) {
+    std::cout << std::to_string(iii) << ", ";
+  }
+  std::cout << "\n";*/
+  std::vector<ExtStr> resArr = findPossibleExtensions(iT, exc, circle[circle.size() - 1]);
+  const auto compareI{[](ExtStr e1, ExtStr e2) -> bool {
+    return !(e1.dist > e2.dist);
+  }};
+  sort(resArr.begin(), resArr.end(), compareI);
+
+  /*for (ExtStr e1234 : resArr) {
+    std::cout << "resArr1: " << e1234.intersectionIdx << ", " << e1234.dist << "," << e1234.myArrow << ", " << e1234.opposingArrow << "\n";
+  }*/
+
+  std::vector<int> circlePlus;
+  for (ExtStr extStr1 : resArr) {
+    if (extStr1.myArrow == searchingDir) {
+      circlePlus.clear();
+      copy(circle.begin(), circle.end(), back_inserter(circlePlus));
+      if (circle[0] == extStr1.intersectionIdx) return true;    // If we get a circle, finish recursion
+      if (std::find(circle.begin(), circle.end(), extStr1.intersectionIdx) == circle.end()) { // If we don't already have this guy in the circle, add it
+        circlePlus.push_back(extStr1.intersectionIdx);
+        if(recursiveBestCircle(iT, exc, circlePlus, extStr1.opposingArrow == 1 ? 2:1)) {
+          circle = circlePlus;
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+bool recursiveBestCircle(const std::vector<TriangleNode3D>& iT, const std::vector<int>& exc,std::vector<int>& circle,const int& searchingDir); // .hpp
