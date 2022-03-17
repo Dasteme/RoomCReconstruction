@@ -491,12 +491,17 @@ namespace RoomCReconstruction {
       TriangleAttempt ta(idxC1, idxC2, idxC3);
 
       // For debugging
-      if (idxC1 == 0 && idxC2 == 1 && idxC3 == 26) {
+      if (idxC1 == 12 && idxC2 == 13 && idxC3 == 42) {
         ta.debugIt = true;
       }
 
+
       ta.computeIt(bb, clusters);
+
+      //ta.printYourNPA();
+      //ta.printCombiDiff();
       if (!ta.isSuccess()) return;
+
 
       std::cout << "Found Arrow: " << idxC1 << "," << idxC2 << "," << idxC3 << ", idx: " << intersection_triangles.size() << "\n";
 

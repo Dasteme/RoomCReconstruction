@@ -16,14 +16,21 @@ namespace RoomCReconstruction {
 
 constexpr double arrowPiecesSize = 0.1;
 constexpr double emptyRequirement = 0.1; // required empty space behind line, i.e. the minimum thickness of walls.
-constexpr double searchWidth = 2;        // Searches in this radius for occpied pieces. So we can reconstruct occluded parts only within this distance.
+constexpr double searchWidth = 4.0;        // Searches in this radius for occpied pieces. So we can reconstruct occluded parts only within this distance.
 
 constexpr double min_inw_occ = 0.15;
 
 constexpr double min_req_closeness = 1.0; // How close does a wall need to be to at least one of the other two's for a possible corner?
                                           // Can be set to infinity, in this case, every combination of 3 clusters is intersected to look for a triangle
 
+constexpr double allow_early_quit_after = 0.6;  // Increses the speed and quality of the triangle-finding-algorithm.
+                                                // Quality because we prefer the first possible triangle rather than the best (which goes maybe across the whole wall).
 
+/*struct DebugCombis {
+  int i1;
+  int i2;
+  int i3;
+};*/
 
 
 class TriangleAttempt
@@ -40,11 +47,15 @@ public:
   Eigen::Vector3d edgeLine2;
   Eigen::Vector3d edgeLine3;
 
+  /*std::vector<DebugCombis> dbgOld;
+  std::vector<DebugCombis> dbgNew;*/
+
 
   std::vector<Eigen::Vector2d> flatpointsC1;
   std::vector<Eigen::Vector2d> flatpointsC2;
   std::vector<Eigen::Vector2d> flatpointsC3;
   std::array<std::vector<std::vector<bool>>, 3> flatQuadrats;
+  //std::array<std::vector<std::vector<double>>, 3> precomputedOccupations;
   std::array<int, 6> max_npA;
 
   int idxC1;
@@ -107,11 +118,21 @@ public:
       std::min(applyDiscrete(max_neg_a3_d), applyDiscrete(searchWidth))  // max_neg_a3
     };
 
+    if ((max_npA[0] == 0 && max_npA[1] == 0) ||
+        (max_npA[2] == 0 && max_npA[3] == 0) ||
+        (max_npA[4] == 0 && max_npA[5] == 0)) {std::cout << "Fast return for: " << idxC1 << "," << idxC2 << "," << idxC3 << "\n"; return;}
     flatQuadrats = {
       std::vector<std::vector<bool>>(max_npA[0]+max_npA[1], std::vector<bool>(max_npA[2]+max_npA[3], false)),
       std::vector<std::vector<bool>>(max_npA[0]+max_npA[1], std::vector<bool>(max_npA[4]+max_npA[5], false)),
       std::vector<std::vector<bool>>(max_npA[2]+max_npA[3], std::vector<bool>(max_npA[4]+max_npA[5], false))
     };
+
+    /*precomputedOccupations = {
+      std::vector<std::vector<double>>(max_npA[0]+max_npA[1], std::vector<double>(max_npA[2]+max_npA[3], -1)),
+      std::vector<std::vector<double>>(max_npA[0]+max_npA[1], std::vector<double>(max_npA[4]+max_npA[5], -1)),
+      std::vector<std::vector<double>>(max_npA[2]+max_npA[3], std::vector<double>(max_npA[4]+max_npA[5], -1))
+    };*/
+
 
 
     // Fill up triangles
@@ -153,7 +174,8 @@ public:
 
 
     // Iterate over "all" possible arrow-combinations and adapt best-score and arrows
-    distIterationOLD(max_npA);
+    //distIterationOLD(max_npA);
+    distIteration(max_npA);
 
     if (best_a1 < 0) edgeLine1 = -edgeLine1;
     if (best_a2 < 0) edgeLine2 = -edgeLine2;
@@ -170,18 +192,17 @@ public:
   };
 
   int specialArrowDecInc(int arrow_i) {
+    //return arrow_i+1;
 
-    if (arrow_i < 0 && arrow_i >= -6) return arrow_i+1;
-    if (arrow_i < -6 && arrow_i >= -12) return arrow_i+2;
-    if (arrow_i < -12 && arrow_i >= -20) return arrow_i+4;
-    if (arrow_i < -20 && arrow_i >= -36) return arrow_i+8;
+    if (arrow_i < 0 && arrow_i >= -10) return arrow_i+1;
+    if (arrow_i < -10 && arrow_i >= -20) return arrow_i+2;
+    if (arrow_i < -20 && arrow_i >= -40) return arrow_i+4;
 
-    if (arrow_i >= 0 && arrow_i < 6) return arrow_i+1;
-    if (arrow_i >= 6 && arrow_i < 12) return arrow_i+2;
-    if (arrow_i >= 12 && arrow_i < 20) return arrow_i+4;
-    if (arrow_i >= 20 && arrow_i < 36) return arrow_i+8;
+    if (arrow_i >= 0 && arrow_i < 10) return arrow_i+1;
+    if (arrow_i >= 10 && arrow_i < 20) return arrow_i+2;
+    if (arrow_i >= 20 && arrow_i < 40) return arrow_i+4;
 
-    return arrow_i + 16;
+    return arrow_i + 8;
   };
   void distIterationOLD(std::array<int, 6>& max_npA) {
     for (int a1_i = -max_npA[1]; a1_i <= max_npA[0]; a1_i = specialArrowDecInc(a1_i)) {
@@ -193,33 +214,44 @@ public:
         for (int a3_i = -max_npA[5]; a3_i <= max_npA[4]; a3_i = specialArrowDecInc(a3_i)) {
           if (a3_i == 0) continue;
 
-          computeArrowCombiOcc(a1_i, a2_i, a3_i);
+          //dbgOld.push_back({a1_i, a2_i, a3_i});
+          //computeArrowCombiOcc(a1_i, a2_i, a3_i);
         }
       }
     }
   }
 
   void distIteration(std::array<int, 6>& max_npA) {
-    for (int dist = 0; dist < getMax_maxNPA(max_npA); dist++) {
+    for (int dist = 0; dist <= getMax_maxNPA(max_npA); dist = specialArrowDecInc(dist)) {
       // Calculate all possible rectangles with this distance.
       // This means, at least one arrow must have this distance
+      if (dist >= allow_early_quit_after && isSuccess()) break;  // We may quit early
 
       surfaceIterator(dist, dist, max_npA[3], max_npA[2], max_npA[5], max_npA[4], [this, dist](int i, int j) -> void {
-        computeArrowCombiOcc(dist, i, j);
+        //if (dist <= this->max_npA[0]) dbgNew.push_back({dist, i, j});
+        //if (dist <= this->max_npA[1]) dbgNew.push_back({-dist, i, j});
+        if (dist <= this->max_npA[0]) computeArrowCombiOcc(dist, i, j);
+        if (dist <= this->max_npA[1]) computeArrowCombiOcc(-dist, i, j);
       });
-      surfaceIterator(dist-1, dist, max_npA[2], max_npA[1], max_npA[5], max_npA[4], [this, dist](int i, int j) -> void {
-        computeArrowCombiOcc(i, dist, j);
+      surfaceIterator(dist-1, dist, max_npA[1], max_npA[0], max_npA[5], max_npA[4], [this, dist](int i, int j) -> void {
+        //if (dist <= this->max_npA[2]) dbgNew.push_back({i, dist, j});
+        //if (dist <= this->max_npA[3]) dbgNew.push_back({i, -dist, j});
+        if (dist <= this->max_npA[2]) computeArrowCombiOcc(i, dist, j);
+        if (dist <= this->max_npA[3]) computeArrowCombiOcc(i, -dist, j);
       });
-      surfaceIterator(dist-1, dist-1, max_npA[2], max_npA[1], max_npA[3], max_npA[2], [this, dist](int i, int j) -> void {
-        computeArrowCombiOcc(i, j, dist);
+      surfaceIterator(dist-1, dist-1, max_npA[1], max_npA[0], max_npA[3], max_npA[2], [this, dist](int i, int j) -> void {
+        //if (dist <= this->max_npA[4]) dbgNew.push_back({i, j, dist});
+        //if (dist <= this->max_npA[5]) dbgNew.push_back({i, j, -dist});
+        if (dist <= this->max_npA[4]) computeArrowCombiOcc(i, j, dist);
+        if (dist <= this->max_npA[5]) computeArrowCombiOcc(i, j, -dist);
       });
     }
   }
 
   void surfaceIterator(int dist1, int dist2, int dir1_min, int dir1_max, int dir2_min, int dir2_max, std::function<void(int, int)> cb) {
-    for (int a2_it = -std::min(dist1, dir1_min); a2_it <= std::min(dist1, dir1_max); a2_it++) {
+    for (int a2_it = -std::min(dist1, dir1_min); a2_it <= std::min(dist1, dir1_max); a2_it = specialArrowDecInc(a2_it)) {
       if (a2_it == 0) continue;
-      for (int a3_it = -std::min(dist2, dir2_min); a3_it <= std::min(dist2, dir2_max); a3_it++) {
+      for (int a3_it = -std::min(dist2, dir2_min); a3_it <= std::min(dist2, dir2_max); a3_it = specialArrowDecInc(a3_it)) {
         if (a3_it == 0) continue;
         cb(a2_it, a3_it);
       }
@@ -231,6 +263,7 @@ public:
   void computeArrowCombiOcc (int a1_i,
                                int a2_i,
                                int a3_i) {
+
 
     double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0, flatQuadrats[0], max_npA);
     if (C1_occup > 0 && C1_occup <= min_inw_occ) return;
@@ -437,6 +470,44 @@ public:
     writePointsWithFaces(filename, vertices, faces);
   }
 
+  void printYourNPA() {
+    std::cout << "NPA tri: " << max_npA[0] << "," << max_npA[1]
+              << "," << max_npA[2] << "," << max_npA[3]
+              << "," << max_npA[4] << "," << max_npA[5] << "\n";
+
+  }
+  /*void printCombiDiff() {
+    if (dbgOld.size() != dbgNew.size()) {std::cout << "old-size: " << dbgOld.size() << ", new-size: " << dbgNew.size() << "\n";}
+    for (DebugCombis dbC : dbgOld) {
+      int found = 0;
+      for (DebugCombis dbC2 : dbgNew) {
+        if (dbC.i1 == dbC2.i1 && dbC.i2 == dbC2.i2 && dbC.i3 == dbC2.i3) {
+          found++;
+        }
+      }
+      if (found == 0) {
+        std::cout << "Did not find in new: " << dbC.i1 << "," << dbC.i2 << "," << dbC.i3 << "\n";
+      } else if (found > 1) {
+        std::cout << "Found multiple times in new: " << dbC.i1 << "," << dbC.i2 << "," << dbC.i3 << "\n";
+      }
+    }
+
+
+    for (DebugCombis dbC : dbgNew) {
+      int found = 0;
+      for (DebugCombis dbC2 : dbgOld) {
+        if (dbC.i1 == dbC2.i1 && dbC.i2 == dbC2.i2 && dbC.i3 == dbC2.i3) {
+          found++;
+        }
+      }
+      if (found == 0) {
+        std::cout << "Did not find in old: " << dbC.i1 << "," << dbC.i2 << "," << dbC.i3 << "\n";
+      } else if (found > 1) {
+        std::cout << "Found multiple times in old: " << dbC.i1 << "," << dbC.i2 << "," << dbC.i3 << "\n";
+      }
+    }
+
+  }*/
 };
 
 

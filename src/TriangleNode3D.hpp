@@ -4,10 +4,10 @@
 
 #pragma once
 
+#include "Helper.hpp"
+#include "queue"
 #include "ts/pc/pc_tools.hpp"
 #include <iostream>
-#include "queue"
-
 
 namespace RoomCReconstruction {
   struct ExtStr {
@@ -39,6 +39,7 @@ struct ExtStr2 {
     std::array<std::vector<ExtStr2>, 3> possibilites;
     std::array<int, 3> chosen;
 
+    //std::array<double, 3> arrowLimits;
 
     // Triangle Data (is set up during constructing. No Node can exist without it)
     int myIndex;
@@ -68,7 +69,9 @@ struct ExtStr2 {
     {
       possibilites = {std::vector<ExtStr2>(), std::vector<ExtStr2>(), std::vector<ExtStr2>()};
       chosen = {-1, -1, -1};
-
+      //arrowLimits = {std::numeric_limits<double>::max(),
+      //                  std::numeric_limits<double>::max(),
+      //                  std::numeric_limits<double>::max()};
     }
 
     // Note: might not work in every room-case because
@@ -179,6 +182,13 @@ struct ExtStr2 {
 
                 possibilites[myArrowIdx].push_back({myIdx, i, (t.corner - this->corner).norm(), inventedLen, myArrowIdx, followingArrayIdx});
               }
+            } else {
+              // Limit the possible followers if there is a triangle looking in the same direction as the arrow
+              // Check if arrows are like this:   <----S    <---M, and not <-----M   <---S
+              // For this, M+arrow to S must be smaller than M to S  (Note: M: main, S: second/follower)
+              //if (calcDistance(this->corner + this->arrows[myArrowIdx], t.corner)   < calcDistance(this->corner, t.corner)) {
+              //  arrowLimits[myArrowIdx] = std::min(arrowLimits[myArrowIdx], calcDistance(this->corner, t.corner));
+              //}
             }
           }
         }
@@ -187,12 +197,22 @@ struct ExtStr2 {
 
 
     void sortPossibilities() {
-      /*const auto comparePoss{[](ExtStr2 e1, ExtStr2 e2) -> bool {
-        return !(e1.dist > e2.dist);
-      }};*/
-      const auto comparePoss{[](ExtStr2 e1, ExtStr2 e2) -> bool {
-        return (e1.inventedLen < e2.inventedLen);
+
+      // Returns true if e1 is better than e2
+      const auto comparePoss{[this](ExtStr2 e1, ExtStr2 e2) -> bool {
+        //if (e1.dist > arrowLimits[e1.myArrow] && e2.dist <= arrowLimits[e2.myArrow]) return false; // if e1 is out of limit and e2 is not, prefer e2
+        //if (e1.dist <= arrowLimits[e1.myArrow] && e2.dist > arrowLimits[e2.myArrow]) return false; // other way around
+
+        // If the difference is very small, we prefer a longer arrow (otherwise, what are we doing to do with the second arrow?)
+        // TODO: Maybe the second one is the wrong arrow. Compare scores of arrow to determine which is better.
+        if (std::abs(e1.dist - e2.dist) < 0.5) {
+          return e1.dist > e2.dist;
+        }
+        return e1.dist < e2.dist;
       }};
+      /*const auto comparePoss{[](ExtStr2 e1, ExtStr2 e2) -> bool {
+        return (e1.inventedLen < e2.inventedLen);
+      }};*/
 
       for (int i = 0; i < 3; i++) {
         std::sort(possibilites[i].begin(), possibilites[i].end(), comparePoss);
