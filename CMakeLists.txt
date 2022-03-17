@@ -17,6 +17,8 @@ set(HEADER_FILES
         external/ts/pc/pc_tools.hpp
         src/wallextender.hpp
         src/TriangleNode3D.hpp
+        src/TriangleAttempt.hpp
+        src/Cluster.hpp
         src/rcr_io.hpp
         src/Helper.hpp
         )
@@ -29,6 +31,8 @@ set(SOURCE_FILES
         src/main.cpp
         src/wallextender.cpp
         src/TriangleNode3D.cpp
+        src/TriangleAttempt.cpp
+        src/Cluster.cpp
         src/rcr_io.cpp
         src/Helper.cpp
         )

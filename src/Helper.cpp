@@ -246,6 +246,43 @@ namespace RoomCReconstruction {
     return (randomBetween(0, 1) - probability) < 0;
   }
 
+
+
+std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d center, Eigen::Vector3d normal, const std::vector<Eigen::Vector3d>& pnts, Eigen::Vector3d a1, Eigen::Vector3d a2) {
+  assert (c.normal.dot(a1) > 0.001);
+  assert (c.normal.dot(a2) > 0.001);
+  //assert (a1.dot(a2) > 0.001);     // Not anymore, also accepts a1 and a2 not orthogonal.
+
+  std::vector <Eigen::Vector2d> points2D;
+
+  for (int i = 0; i < pnts.size(); i++) {
+    //points2D.emplace_back(Eigen::Vector2d{a1.dot(c.pointsReal[i] - center), a2.dot(c.pointsReal[i] - center)});
+    Eigen::Vector3d N = a1.cross(normal);
+    Eigen::Vector3d V = center;
+    Eigen::Vector3d D = -a2;
+    Eigen::Vector3d P = pnts[i];
+
+    double x_projected = ((V-P).dot(N)) / N.dot(D);
+
+    Eigen::Vector3d N2 = a2.cross(normal);
+    Eigen::Vector3d V2 = center;
+    Eigen::Vector3d D2 = -a1;
+    Eigen::Vector3d P2 = pnts[i];
+
+    double y_projected = ((V2-P2).dot(N2)) / N2.dot(D2);
+
+    points2D.emplace_back(Eigen::Vector2d{ y_projected, x_projected });
+  }
+
+  return points2D;
+}
+bool insideBB(BoundingBox& bb, Eigen::Vector3d& p) {
+  return p[0] >= bb.minX-0.1 && p[0] <= bb.maxX+0.1
+         && p[1] >= bb.minY-0.1 && p[1] <= bb.maxY+0.1
+         && p[2] >= bb.minZ-0.1 && p[2] <= bb.maxZ+0.1;
+}
+
+
 int getCircularIndex(int arraySize, int index) {
   if (index >= arraySize) {
     return index % arraySize;
