@@ -143,10 +143,10 @@ public:
                        double dist,
                        double angle_frac,
                        double reqPercent,
-                       bool requireCloseness)
+                       double requireCloseness)
   {
     double unnec_dist_p = -1;
-    if (requireCloseness && distanceToOtherCluster(toMergeCluster) > 0.5)
+    if (requireCloseness >= 0 && distanceToOtherCluster(toMergeCluster) > requireCloseness)
       return;
     if (reqPercent == 0) {
 

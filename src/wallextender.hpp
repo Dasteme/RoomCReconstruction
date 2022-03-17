@@ -24,7 +24,7 @@ namespace RoomCReconstruction {
       double angleFracMerging;
       double distMerging;
       double reqPoints;
-      bool requireCloseness;
+      double requireCloseness;
     };
 
 

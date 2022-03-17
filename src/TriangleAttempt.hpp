@@ -55,7 +55,7 @@ public:
   std::vector<Eigen::Vector2d> flatpointsC2;
   std::vector<Eigen::Vector2d> flatpointsC3;
   std::array<std::vector<std::vector<bool>>, 3> flatQuadrats;
-  //std::array<std::vector<std::vector<double>>, 3> precomputedOccupations;
+  std::array<std::vector<std::vector<double>>, 3> occupationsCache;
   std::array<int, 6> max_npA;
 
   int idxC1;
@@ -127,11 +127,11 @@ public:
       std::vector<std::vector<bool>>(max_npA[2]+max_npA[3], std::vector<bool>(max_npA[4]+max_npA[5], false))
     };
 
-    /*precomputedOccupations = {
+    occupationsCache = {
       std::vector<std::vector<double>>(max_npA[0]+max_npA[1], std::vector<double>(max_npA[2]+max_npA[3], -1)),
       std::vector<std::vector<double>>(max_npA[0]+max_npA[1], std::vector<double>(max_npA[4]+max_npA[5], -1)),
       std::vector<std::vector<double>>(max_npA[2]+max_npA[3], std::vector<double>(max_npA[4]+max_npA[5], -1))
-    };*/
+    };
 
 
 
@@ -265,13 +265,13 @@ public:
                                int a3_i) {
 
 
-    double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0, flatQuadrats[0], max_npA);
+    double C1_occup = computeOccupationSimplifier(a1_i, a2_i, 0);
     if (C1_occup > 0 && C1_occup <= min_inw_occ) return;
 
-    double C2_occup = computeOccupationSimplifier(a1_i, a3_i, 1, flatQuadrats[1], max_npA);
+    double C2_occup = computeOccupationSimplifier(a1_i, a3_i, 1);
     if (C2_occup > 0 && C2_occup <= min_inw_occ) return; // Fast forwarding
 
-    double C3_occup = computeOccupationSimplifier(a2_i, a3_i, 2, flatQuadrats[2], max_npA);
+    double C3_occup = computeOccupationSimplifier(a2_i, a3_i, 2);
     //if (C3_occup > 0 && C3_occup <= 0.2) continue; // Fast forwarding // useless
 
 
@@ -284,7 +284,7 @@ public:
     bool inwards;
 
     if (C1_occup == 0 && C2_occup >= 0.3 && C3_occup >= 0.3) {
-      double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc, flatQuadrats[0], max_npA);
+      double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc);
 
       if (C1_revOcc <= 0.3) return;
 
@@ -292,14 +292,14 @@ public:
       inwards = false;
 
     } else if (C1_occup >= 0.3 && C2_occup == 0 && C3_occup >= 0.3) {
-      double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, minForC2_revOcc, flatQuadrats[1], max_npA);
+      double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, minForC2_revOcc);
 
       if (C2_revOcc <= 0.3) return;
 
       least_occ = std::min(std::min(C1_occup, C2_revOcc), C3_occup);
       inwards = false;
     } else if (C1_occup >= 0.3 && C2_occup >= 0.3 && C3_occup == 0) {
-      double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, minForC3_revOcc, flatQuadrats[2], max_npA);
+      double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, minForC3_revOcc);
 
       if (C3_revOcc <= 0.3) return;
 
@@ -309,9 +309,9 @@ public:
       least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
 
       // Make sure the first 20cm are empty
-      double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[0], max_npA);
-      double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[1], max_npA);
-      double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, std::ceil(emptyRequirement / arrowPiecesSize), flatQuadrats[2], max_npA);
+      double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, std::ceil(emptyRequirement / arrowPiecesSize));
+      double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, std::ceil(emptyRequirement / arrowPiecesSize));
+      double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, std::ceil(emptyRequirement / arrowPiecesSize));
 
       if (C1_revOcc > 0.2 || C2_revOcc > 0.2 || C3_revOcc > 0.2) return;
 
@@ -344,7 +344,12 @@ public:
 
 
 
-  double computeOccupation(int min_i, int max_i, int min_j, int max_j, std::vector<std::vector<bool>> flatQuadrat) {
+  double computeOccupation(int x, int y, int cl_idx) {
+
+    int min_i = ((x < 0 ? x:0) + max_npA[getNegArrInd(true, cl_idx)]);
+    int max_i = ((x < 0 ? 0:x) + max_npA[getNegArrInd(true, cl_idx)]);
+    int min_j = ((y < 0 ? y:0) + max_npA[getNegArrInd(false, cl_idx)]);
+    int max_j = ((y < 0 ? 0:y) + max_npA[getNegArrInd(false, cl_idx)]);
 
     if ((max_i-min_i) < 1 || (max_j-min_j) < 1) {
       std::cout << "computeOccError: distance is smaller than 1\n";
@@ -353,8 +358,8 @@ public:
     int summed = 0;
     for (int i = min_i; i < max_i; i++) {
       for (int j = min_j; j < max_j; j++) {
-        if (i < flatQuadrat.size() && j < flatQuadrat[i].size()) {  // If i or j is out of boundaries, assume there is an empty flatQ
-          if (flatQuadrat[i][j]) {
+        if (i < flatQuadrats[cl_idx].size() && j < flatQuadrats[cl_idx][i].size()) {  // If i or j is out of boundaries, assume there is an empty flatQ
+          if (flatQuadrats[cl_idx][i][j]) {
             summed++;
           }
         }
@@ -363,30 +368,32 @@ public:
     return (double) summed / ((max_i-min_i) * (max_j-min_j));
   }
 
-  double computeOccupationSimplifier(int x2, int y, int cl_idx, std::vector<std::vector<bool>>& flatQuadrat, std::array<int, 6>& max_npA) {
-    return computeOccupation(((x2 < 0 ? x2:0) + max_npA[getNegArrInd(true, cl_idx)]),
-                             ((x2 < 0 ? 0:x2) + max_npA[getNegArrInd(true, cl_idx)]),
-                             ((y < 0 ? y:0) + max_npA[getNegArrInd(false, cl_idx)]),
-                             ((y < 0 ? 0:y) + max_npA[getNegArrInd(false, cl_idx)]),
-                             flatQuadrat);
+  double computeOccupationSimplifier(int x, int y, int cl_idx) {
+    double x_prep = x + max_npA[getNegArrInd(true, cl_idx)];
+    double y_prep = y + max_npA[getNegArrInd(false, cl_idx)];
+
+    // Note: May happen because reversed tries to access outside scope.
+    // For now, we don't use caching here
+    if (x_prep < 0 || x_prep >= occupationsCache[cl_idx].size() || y_prep < 0 || y_prep >= occupationsCache[cl_idx][x_prep].size()) {
+     return computeOccupation(x,y,cl_idx);
+     }
+
+    double& cache = occupationsCache[cl_idx][x_prep][y_prep];
+    if (cache == -1) {
+      cache = computeOccupation(x,y,cl_idx);
+    }
+    double myDbl = cache;
+    return myDbl;
   };
 
-  double computeOccupationReversedSimplifier(int x, int y, int cl_idx, int reversedLen, std::vector<std::vector<bool>>& flatQuadrat, std::array<int, 6>& max_npA) {
-    return (computeOccupation(((x < 0 ? 0:-reversedLen) + max_npA[getNegArrInd(true, cl_idx)]),
-                              ((x < 0 ? reversedLen:0) + max_npA[getNegArrInd(true, cl_idx)]),
-                              ((y < 0 ? y:0) + max_npA[getNegArrInd(false, cl_idx)]),
-                              ((y < 0 ? 0:y) + max_npA[getNegArrInd(false, cl_idx)]),
-                              flatQuadrat) +
-            computeOccupation(((x < 0 ? x:0) + max_npA[getNegArrInd(true, cl_idx)]),
-                              ((x < 0 ? 0:x) + max_npA[getNegArrInd(true, cl_idx)]),
-                              ((y < 0 ? 0:-reversedLen) + max_npA[getNegArrInd(false, cl_idx)]),
-                              ((y < 0 ? reversedLen:0) + max_npA[getNegArrInd(false, cl_idx)]),
-                              flatQuadrat) +
-            computeOccupation(((x < 0 ? 0:-reversedLen) + max_npA[getNegArrInd(true, cl_idx)]),
-                              ((x < 0 ? reversedLen:0) + max_npA[getNegArrInd(true, cl_idx)]),
-                              ((y < 0 ? 0:-reversedLen) + max_npA[getNegArrInd(false, cl_idx)]),
-                              ((y < 0 ? reversedLen:0) + max_npA[getNegArrInd(false, cl_idx)]),
-                              flatQuadrat)) / 3;
+
+  double computeOccupationReversedSimplifier(int x, int y, int cl_idx, int reversedLen) {
+    double cache1 = computeOccupationSimplifier((x >= 0 ? -reversedLen : reversedLen), y, cl_idx);
+    double cache2 = computeOccupationSimplifier(x, (y >= 0 ? -reversedLen : reversedLen), cl_idx);
+    double cache3 = computeOccupationSimplifier(
+      (x >= 0 ? -reversedLen : reversedLen), (y >= 0 ? -reversedLen : reversedLen), cl_idx);
+
+    return (cache1 + cache2 + cache3) / 3;
   };
 
 

@@ -152,6 +152,13 @@ namespace RoomCReconstruction {
 
         std::cout << "Found " << clusters.size() << " Clusters\n";
 
+      // sort cluster s.t. small clusters are first merged to bigger ones
+      const auto compareCluster{[](Cluster c1, Cluster c2) -> bool {
+        return c1.points.size() > c2.points.size();
+      }};
+      std::sort(clusters.begin(), clusters.end(), compareCluster);
+
+
       // Code for coloring clusters according to their index for easier debugging.
       // It works for around 65'000 clusters, in contrast to the easier coloring further down
       // which only works for 255 clusters
@@ -177,9 +184,9 @@ namespace RoomCReconstruction {
 
 
 
-      std::vector<MergingReq> mergingQueue = {{req_angle, 0.1, 0, true},                        // Merges close similar clusters
-                                              {5, vert_merging, 0.5, true},                 // Merges unplanar regions to a plane, like curtains
-                                              {req_angle*2, 0.1 / 2, 0, false}};     // Merges distant clusters belonging to the same wall.
+      std::vector<MergingReq> mergingQueue = {{req_angle, 0.1, 0, 0.5},                        // Merges close similar clusters
+                                              {5, vert_merging, 0.5, 0.5},                 // Merges unplanar regions to a plane, like curtains
+                                              {req_angle, 0.1, 0, -1}};     // Merges distant clusters belonging to the same wall.
                                                                                                                                  // Need to be quite exact, otherwise we are possibly going to merge wall+furniture, slightly change the walls normal and then arrow-finding is less exact and may even get wrong arrows
 
 
