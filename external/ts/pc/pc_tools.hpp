@@ -72,6 +72,9 @@ computeLocalPCAForPoint(const SearchTree& search_tree,
                         std::size_t neighbour_k,
                         double max_radius);
 
+[[nodiscard]] LocalPCA
+computePCA(const PointsContainer& points, std::vector<std::size_t> to_use_points);
+
 template<const bool run_parallel = true>
 [[nodiscard]] std::vector<LocalPCA>
 computeLocalPCAAllPoints(const SearchTree& search_tree,
@@ -96,7 +99,7 @@ computeLocalPCAAllPoints(const SearchTree& search_tree,
           search_tree,
           point_index,
           neighbour_k,
-          std::max(max_radius(static_cast<Eigen::Index>(point_index)), max_dist));
+          max_dist);
       });
   } else {
     for (std::size_t i{ 0 }; i != total_points; ++i) {

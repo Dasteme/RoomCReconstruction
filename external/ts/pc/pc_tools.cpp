@@ -259,6 +259,13 @@ computeLocalPCAForPoint(const SearchTree& search_tree,
     }
   }
 
+  return computePCA(points, to_use_points);
+}
+
+
+LocalPCA
+computePCA(const PointsContainer& points, std::vector<std::size_t> to_use_points)
+{
   // If we have enough points, compute the local PCA
   const std::size_t to_add_points{ to_use_points.size() };
   if (to_add_points < 3) {
@@ -288,8 +295,10 @@ computeLocalPCAForPoint(const SearchTree& search_tree,
     svd{ neighbor_points, Eigen::ComputeThinV };
 
   return { svd.singularValues().cwiseProduct(svd.singularValues()) /
-             static_cast<double>(to_add_points - 1),
+           static_cast<double>(to_add_points - 1),
            svd.matrixV() };
 }
+
+
 
 }

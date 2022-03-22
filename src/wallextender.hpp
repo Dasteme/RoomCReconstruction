@@ -102,7 +102,7 @@ void printPointsWRTClusters(const std::string& filename,
 
     void
     extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
-                    const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing);
+                    const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing, double req_prop, double max_possible_rec_angle);
 
 
 

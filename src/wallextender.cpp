@@ -16,7 +16,7 @@ namespace RoomCReconstruction {
 
 
     double req_angle = 32;      // What's the minimum angle you can accept?
-    double vert_merging = 0.2;  // How big do you want to merge clusters "inside" clusters disregarding the angle?
+    double vert_merging = 0.15;  // How big do you want to merge clusters "inside" clusters disregarding the angle?
 
 
 
@@ -34,7 +34,7 @@ namespace RoomCReconstruction {
 
 
     void extendWallpoint(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
-                         const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing) {
+                         const std::vector <TangentSpace::LocalPCA> &local_pcas, const double avg_spacing, double req_prop, double max_possible_rec_angle) {
 
         std::cout << "extending wallpoint\n";
 
@@ -53,23 +53,38 @@ namespace RoomCReconstruction {
       std::vector<bool> addedPoints = std::vector<bool>(local_pcas.size(), false);
         std::queue<size_t> pointQueue;
 
+      std::vector<int> clusterSuggestions = std::vector<int>(local_pcas.size(), -1);
+
+      int nbrProcessedPoints = 0;
+      int queueNewStarted = 0;
+      int queuePopped = 0;
+      int foundBySuggestion = 0;
+      int foundByClusterFor = 0;
+      int foundByNewCl = 0;
 
       for (int localPcasIter = 0; localPcasIter != local_pcas.size(); ++localPcasIter) {
+
         if (!addedPoints[localPcasIter]) {
+          queueNewStarted++;
+
           pointQueue.push(localPcasIter);
           addedPoints[localPcasIter] = true;
         }
 
         // For all points
         while (!pointQueue.empty()) {
+          if (((double)queuePopped / local_pcas.size()) * 100 >= (debugPercent + 1)) {
+            std::cout << (++debugPercent) << "%, " << clusters.size() << " clusters found\n";
+
+            //printPointsWRTClusters("./video_A_video_step1_" + formatInteger(queuePopped, 12)  + ".ply", points, clusters, colors);
+          }
+
+          queuePopped++;
+
           int i = pointQueue.front();
           pointQueue.pop();
 
-          if (((double)i / local_pcas.size()) * 100 >= (debugPercent + 1)) {
-            std::cout << (++debugPercent) << "%, " << clusters.size() << " clusters found\n";
 
-            // printPointsWRTClusters("./video_A_video_step1_" + formatInteger(i, 12)  + ".ply", points, clusters, colors);
-          }
 
           const double ev_sum{ local_pcas[i].eigenvalues.sum() };
           const double lambda_1{ local_pcas[i].eigenvalues.x() / ev_sum };
@@ -90,7 +105,7 @@ namespace RoomCReconstruction {
           if (planarPointScore > 0.4 || stringPointScore > 0.2) {
             colors[i] = colorGrey;
           }
-          if (planarPointScore < 0.95 || stringPointScore > 0.3) {
+          if (planarPointScore < req_prop || stringPointScore > 0.3) {
             continue;
           }
 
@@ -105,29 +120,51 @@ namespace RoomCReconstruction {
 
           search_tree.index->findNeighbors(result_set, query_point_data, nanoflann::SearchParams{});
 
+          /*std::cout << "Found " << ret_indexes.size() << " neighbors!\n";
+          for (int neighbor_i = 0; neighbor_i < ret_indexes.size(); neighbor_i++) {
+            std::cout << "neighbor: " << ret_indexes[neighbor_i] << "\n";
+          }*/
 
-          bool found = false;
-          for (int j = 0; j != clusters.size(); j++) {
-            if (clusters[j].checkAndAdd(points.col(static_cast<Eigen::Index>(i)),
+          int found = -1;
+          if (clusterSuggestions[i] >= 0) {
+            if (clusters[clusterSuggestions[i]].checkAndAdd(points.col(static_cast<Eigen::Index>(i)),
                                         local_pcas[i].local_base.col(2),
-                                        0.1,
-                                        req_angle,
+                                          0.05,
+                                          max_possible_rec_angle,
                                         i,
                                         true)) {
               // colors[i] = clusters[j].color;
-              found = true;
-              break;
+              found = clusterSuggestions[i];
+              foundBySuggestion++;
             }
           }
-          if (!found) {
+
+          if (found < 0) {
+            for (int j = 0; j != clusters.size(); j++) {
+              if (clusters[j].checkAndAdd(points.col(static_cast<Eigen::Index>(i)),
+                                          local_pcas[i].local_base.col(2),
+                                          0.05,
+                                          max_possible_rec_angle,
+                                          i,
+                                          true)) {
+                // colors[i] = clusters[j].color;
+                found = j;
+                foundByClusterFor++;
+                break;
+              }
+            }
+          }
+
+
+          if (found < 0) {
             Cluster newCluster;
             newCluster.normal = local_pcas[i].local_base.col(2);
             newCluster.center = points.col(static_cast<Eigen::Index>(i));
             newCluster.markerPoints.push_back(points.col(static_cast<Eigen::Index>(i)));
             if (!newCluster.checkAndAdd(points.col(static_cast<Eigen::Index>(i)),
                                         local_pcas[i].local_base.col(2),
-                                        0.1,
-                                        req_angle,
+                                        0.05,
+                                        max_possible_rec_angle,
                                         i,
                                         true)) {
               std::cout << "ERROR: ADDING CLUSTER WITH POINT CREATION FAILED!\n";
@@ -135,18 +172,45 @@ namespace RoomCReconstruction {
             }
 
             clusters.push_back(newCluster);
+            found = clusters.size() - 1;
+            foundByNewCl++;
+
           }
 
           // Prepare next queue-members
           for (int neighbor_i = 0; neighbor_i < ret_indexes.size(); neighbor_i++) {
-            if (!addedPoints[neighbor_i]) {
-              pointQueue.push(neighbor_i);
-              addedPoints[neighbor_i] = true;
+            if (!addedPoints[ret_indexes[neighbor_i]]) {
+              pointQueue.push(ret_indexes[neighbor_i]);
+              addedPoints[ret_indexes[neighbor_i]] = true;
+              if (clusterSuggestions[ret_indexes[neighbor_i]] == -1) {clusterSuggestions[ret_indexes[neighbor_i]] = found;}
             }
           }
 
+
+
+
+
         }
       }
+
+
+      std::cout << "queueNewStarted: " << queueNewStarted << "\n";
+      std::cout << "queuePopped: " << queuePopped << "\n";
+      std::cout << "foundBySuggestion: " << foundBySuggestion << "\n";
+      std::cout << "foundByClusterFor: " << foundByClusterFor << "\n";
+      std::cout << "foundByNewCl: " << foundByNewCl << "\n";
+
+
+
+
+      /*for (Cluster c : clusters) {
+        c.calculatePlaneExtension();
+      }*/
+
+
+
+
+
 
 
 
@@ -159,6 +223,8 @@ namespace RoomCReconstruction {
       std::sort(clusters.begin(), clusters.end(), compareCluster);
 
 
+
+
       // Code for coloring clusters according to their index for easier debugging.
       // It works for around 65'000 clusters, in contrast to the easier coloring further down
       // which only works for 255 clusters
@@ -169,29 +235,17 @@ namespace RoomCReconstruction {
       printPointsWRTClusters("output_clustering_1_initial.ply", points, clusters, colors);
 
 
-      // For debugging, you can mark the clusters you want to inspect with a specific color
-      /*for (int i = 0; i < clusters.size(); i++) {
-        if ((std::floor(i / 255) == 0) && (i % 255 == 126)) {
-          clusters[i].color = colorRed;
-        } else if ((std::floor(i / 255) == 1) && (i % 255 == 147)) {
-          clusters[i].color = colorGreen;
-        } else {
-          clusters[i].color = colorBlack;
-        }
-      }
-      printPointsWRTClusters("output_clustering_DEBUG_KEYCLUSTER.ply", points, clusters, colors);*/
 
 
 
-
-      std::vector<MergingReq> mergingQueue = {{req_angle, 0.1, 0, 0.5},                        // Merges close similar clusters
-                                              {5, vert_merging, 0.5, 0.5},                 // Merges unplanar regions to a plane, like curtains
-                                              {req_angle, 0.1, 0, -1}};     // Merges distant clusters belonging to the same wall.
-                                                                                                                                 // Need to be quite exact, otherwise we are possibly going to merge wall+furniture, slightly change the walls normal and then arrow-finding is less exact and may even get wrong arrows
-
+      std::vector<MergingReq> mergingQueue = {{max_possible_rec_angle, 0.08, 0, 0.3},                // Merges close similar clusters
+                                              {4, 0.1, 0.7, 0.5},                     // Merges unplanar regions to a plane, like curtains
+                                              {max_possible_rec_angle/2, 0.1, 0, -1}   // Merges distant clusters belonging to the same wall.
+                                                                                          };                                         // Need to be quite exact, otherwise we are possibly going to merge wall+furniture, slightly change the walls normal and then arrow-finding is less exact and may even get wrong arrows
 
       bool stillmerging;
       int video_mergingCounter = 0;
+      int videoCounterCluster = 0;
       for (MergingReq mergReq : mergingQueue) {
         std::cout << "distMerging: " << mergReq.distMerging << "\n";
         std::cout << "angleFracMerging: " << mergReq.angleFracMerging << "\n";
@@ -204,6 +258,13 @@ namespace RoomCReconstruction {
               //std::cout << biggerC.mergedCluster;
               if (biggerC.mergedCluster || smallerC.mergedCluster) continue;
               biggerC.tryMergeCluster(smallerC, mergReq.distMerging, mergReq.angleFracMerging, mergReq.reqPoints, mergReq.requireCloseness);
+              //biggerC.mergingNew(smallerC, mergReq.distMerging, mergReq.reqPoints, mergReq.requireCloseness);
+//              if (smallerC.mergedCluster) {
+//                if (videoCounterCluster++ > 30) {
+//                  printPointsWRTClusters("./video_A_video_step2_" + formatInteger(video_mergingCounter++, 12)  + ".ply", points, clusters, colors);
+//                  videoCounterCluster = 0;
+//                }
+//              }
             }
           }
           stillmerging = false;
@@ -213,9 +274,14 @@ namespace RoomCReconstruction {
               clusters.erase(it--);
             }
           }
+
         }
         printPointsWRTClusters("./video_A_video_step2_" + formatInteger(video_mergingCounter++, 12)  + ".ply", points, clusters, colors);
       }
+
+
+
+
 
       std::cout << clusters.size() << " Clusters after merging\n";
       printPointsWRTClusters("output_clustering_2_after_merging.ply", points, clusters, colors);
@@ -233,7 +299,11 @@ namespace RoomCReconstruction {
       printPointsWRTClusters("output_clustering_3_after_removingSmallones.ply", points, clusters, colors);
 
 
-
+      /*for (Cluster c : clusters) {
+        c.calculatePlaneExtension();
+        std::cout << "Cluster extension: " << c.negativeExtend << ", " << c.maximumExtend << "\n";
+        //c.recalculatePLANE(points);
+      }*/
 
 
 
@@ -344,6 +414,32 @@ namespace RoomCReconstruction {
 
       //writePointsWithFaces("A_Cubes.ply", vertices, faces);
 
+
+
+
+
+
+
+
+      // For debugging, you can mark the clusters you want to inspect with a specific color
+      // Old: (std::floor(i / 255) == 0) && (i % 255 == 126),    (std::floor(i / 255) == 1) && (i % 255 == 147)
+      for (int i = 0; i < clusters.size(); i++) {
+        if (i == 5) {
+          clusters[i].color = colorRed;
+        } else if (i == 38) {
+          clusters[i].color = colorGreen;
+        } else if (i == 41) {
+          clusters[i].color = colorBlue;
+        } else {
+          clusters[i].color = colorBlack;
+        }
+      }
+      printPointsWRTClusters("output_clustering_DEBUG_KEYCLUSTER.ply", points, clusters, colors);
+
+
+
+
+
       std::vector<TriangleNode3D> intersection_triangles;
 
       std::chrono::steady_clock::time_point time_measure = std::chrono::high_resolution_clock::now();
@@ -379,7 +475,7 @@ namespace RoomCReconstruction {
       std::cout << "Setup links between triangles...";
       for (int jj = 0; jj < intersection_triangles.size(); jj++) {
         intersection_triangles[jj].findPossibleFollowers(intersection_triangles, jj);
-        intersection_triangles[jj].sortPossibilities();
+        intersection_triangles[jj].sortPossibilities(intersection_triangles);
       }
       std::cout << "\n";
 
@@ -401,7 +497,8 @@ namespace RoomCReconstruction {
         if (intersection_triangles[jj].isInvalid()) {continue;}
         intersection_triangles[jj].print(intersection_triangles);
 
-        if(intersection_triangles[jj].recursiveGraphTraversal(intersection_triangles, 0)) {
+        RecursionModifiactions mods;
+        if(intersection_triangles[jj].recursiveGraphTraversal(intersection_triangles, 0, mods, true)) {
           std::cout << "found circle!\n";
 
           std::queue<int> possibleFollowups;
@@ -449,6 +546,7 @@ namespace RoomCReconstruction {
           break;
         } else {
           std::cout << "Didn't find anything :(\n";
+          std::cout << "We did " << mods.mods.size() << " modifications\n";
           for (TriangleNode3D& t : intersection_triangles) {
             t.chosen[0] = -1;
             t.chosen[1] = -1;
@@ -498,7 +596,7 @@ namespace RoomCReconstruction {
       TriangleAttempt ta(idxC1, idxC2, idxC3);
 
       // For debugging
-      if (idxC1 == 12 && idxC2 == 13 && idxC3 == 42) {
+      if (idxC1 == 5 && idxC2 == 38 && idxC3 == 41) {
         ta.debugIt = true;
       }
 
@@ -518,7 +616,8 @@ namespace RoomCReconstruction {
         {(std::abs(ta.best_a1))*arrowPiecesSize,
         (std::abs(ta.best_a2))*arrowPiecesSize,
         (std::abs(ta.best_a3))*arrowPiecesSize},
-        ta.bestIsInwards));
+        ta.bestIsInwards,
+        ta.best_score));
     }
 
 
@@ -569,6 +668,7 @@ void printArrows(const std::string& filename, double len, bool needLinks, std::v
                                 std::vector <std::array<unsigned char, 3>>& colors) {
       std::fill(colors.begin(), colors.end(), std::array < unsigned char, 3 > {0});
       for (int i = 0; i < clusters.size(); i++) {
+        if (clusters[i].mergedCluster) continue;
         for (int j = 0; j < clusters[i].points.size(); j++) {
           colors[clusters[i].points[j]] = clusters[i].color;
         }

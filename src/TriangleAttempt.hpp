@@ -15,15 +15,15 @@
 namespace RoomCReconstruction {
 
 constexpr double arrowPiecesSize = 0.1;
-constexpr double emptyRequirement = 0.1; // required empty space behind line, i.e. the minimum thickness of walls.
-constexpr double searchWidth = 4.0;        // Searches in this radius for occpied pieces. So we can reconstruct occluded parts only within this distance.
+constexpr double emptyRequirement = 0.2; // required empty space behind line, i.e. the minimum thickness of walls.
+constexpr double searchWidth = 5.0;        // Searches in this radius for occpied pieces. So we can reconstruct occluded parts only within this distance.
 
 constexpr double min_inw_occ = 0.15;
 
 constexpr double min_req_closeness = 1.0; // How close does a wall need to be to at least one of the other two's for a possible corner?
                                           // Can be set to infinity, in this case, every combination of 3 clusters is intersected to look for a triangle
 
-constexpr double allow_early_quit_after = 0.6;  // Increses the speed and quality of the triangle-finding-algorithm.
+constexpr double allow_early_quit_after = 1.0 / arrowPiecesSize;  // Increses the speed and quality of the triangle-finding-algorithm.
                                                 // Quality because we prefer the first possible triangle rather than the best (which goes maybe across the whole wall).
 
 /*struct DebugCombis {
@@ -194,15 +194,17 @@ public:
   int specialArrowDecInc(int arrow_i) {
     //return arrow_i+1;
 
-    if (arrow_i < 0 && arrow_i >= -10) return arrow_i+1;
-    if (arrow_i < -10 && arrow_i >= -20) return arrow_i+2;
-    if (arrow_i < -20 && arrow_i >= -40) return arrow_i+4;
+    if (arrow_i < 0 && arrow_i >= -6) return arrow_i+1;
+    if (arrow_i < -6 && arrow_i >= -12) return arrow_i+2;
+    if (arrow_i < -12 && arrow_i >= -20) return arrow_i+4;
+    if (arrow_i < -20 && arrow_i >= -36) return arrow_i+8;
 
-    if (arrow_i >= 0 && arrow_i < 10) return arrow_i+1;
-    if (arrow_i >= 10 && arrow_i < 20) return arrow_i+2;
-    if (arrow_i >= 20 && arrow_i < 40) return arrow_i+4;
+    if (arrow_i >= 0 && arrow_i < 6) return arrow_i+1;
+    if (arrow_i >= 6 && arrow_i < 12) return arrow_i+2;
+    if (arrow_i >= 12 && arrow_i < 20) return arrow_i+4;
+    if (arrow_i >= 20 && arrow_i < 36) return arrow_i+8;
 
-    return arrow_i + 8;
+    return arrow_i + 16;
   };
   void distIterationOLD(std::array<int, 6>& max_npA) {
     for (int a1_i = -max_npA[1]; a1_i <= max_npA[0]; a1_i = specialArrowDecInc(a1_i)) {
@@ -225,7 +227,10 @@ public:
     for (int dist = 0; dist <= getMax_maxNPA(max_npA); dist = specialArrowDecInc(dist)) {
       // Calculate all possible rectangles with this distance.
       // This means, at least one arrow must have this distance
-      if (dist >= allow_early_quit_after && isSuccess()) break;  // We may quit early
+      if (dist >= allow_early_quit_after && isSuccess()) {
+        if (debugIt) {std::cout << "We broke early after dist: " << dist << "\n";}
+        break;
+      }  // We may quit early
 
       surfaceIterator(dist, dist, max_npA[3], max_npA[2], max_npA[5], max_npA[4], [this, dist](int i, int j) -> void {
         //if (dist <= this->max_npA[0]) dbgNew.push_back({dist, i, j});

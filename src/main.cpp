@@ -1,5 +1,6 @@
 #include "ts/pc/pc_io.hpp"
 #include "wallextender.hpp"
+#include "Helper.hpp"
 
 #include "tinyply/tinyply.hpp"
 
@@ -7,6 +8,27 @@
 #include <iostream>
 
 int main(int argc, const char* argv[]) {
+
+  // Note: The smaller irregularities you can accept and the bigger walls you can accept, the more exact the result is going to be.
+  //       In the extreme case where you need for example 10cm wall-irregularities and also need walls as small as 10cm, we are not going to
+  //       be able to differentiate between real walls and wall-irregularities.
+    constexpr double req_supported_wallirregularities = 0.006;  // 8mm  (between highest and lowest point in wall, )
+    constexpr double req_supported_minwalllen = 0.1;
+
+    double diff_nmbr = req_supported_minwalllen / req_supported_wallirregularities;
+    double diff_proportion = 1 - (1 / diff_nmbr);
+    std::cout << "diff_prop: " << diff_proportion;
+
+    if (diff_proportion < 0.9) {
+      std::cout << "Warning: The required proportion is very small and it is likely that the result is not going to be good.\n";
+    }
+
+    Eigen::Vector2d vecPlane(req_supported_minwalllen, 0);
+  Eigen::Vector2d vecIrr(req_supported_minwalllen, req_supported_wallirregularities);
+
+
+    double max_possible_rec_angle = (std::numbers::pi_v<double> / acos(vecPlane.dot(vecIrr) / (vecPlane.norm() * vecIrr.norm()))) / 2;
+    std::cout << "The maximum recognized wall-angle-fraction will be: " << max_possible_rec_angle << "\n";
 
     std::srand(time(0));
     std::srand(std::rand());          // Double seeding to overcome the fact that the first digits of time(0) are quite constant.
@@ -18,7 +40,7 @@ int main(int argc, const char* argv[]) {
 
     // Set some variables
     std::chrono::steady_clock::time_point time_measure;
-    double PCA_dist = 0.2;
+    double PCA_dist = req_supported_minwalllen;
 
 
     // Read point cloud
@@ -84,7 +106,7 @@ int main(int argc, const char* argv[]) {
 
     // Compute PCA
     time_measure = std::chrono::high_resolution_clock::now();
-    std::size_t PCA_K = std::ceil(std::pow(PCA_dist, 2) / std::pow(avg_spacing, 2));
+    std::size_t PCA_K = std::ceil(std::pow(PCA_dist, 2) / std::pow((avg_spacing / 2), 2));
     std::cout << "using: " << PCA_K << " as PCA_K\n";
     const auto local_pcas = TangentSpace::computeLocalPCAAllPoints(
             search_tree,
@@ -94,7 +116,7 @@ int main(int argc, const char* argv[]) {
 
 
     // Clustering
-    RoomCReconstruction::extendWallpoint(search_tree, loaded_points, local_pcas, avg_spacing);
+    RoomCReconstruction::extendWallpoint(search_tree, loaded_points, local_pcas, avg_spacing, diff_proportion, max_possible_rec_angle);
 
 
     std::cout << "Hello, World!" << std::endl;

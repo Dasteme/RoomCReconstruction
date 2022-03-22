@@ -21,6 +21,15 @@ namespace RoomCReconstruction {
     std::vector<int> triangles;
   };
 
+  struct ModifiactionElement {
+    int trianlgeIdx;
+    int chosenIdx;
+  };
+  struct RecursionModifiactions {
+    std::vector<ModifiactionElement> mods;
+  };
+
+
 class TriangleNode3D;
 
 struct ExtStr2 {
@@ -39,7 +48,7 @@ struct ExtStr2 {
     std::array<std::vector<ExtStr2>, 3> possibilites;
     std::array<int, 3> chosen;
 
-    //std::array<double, 3> arrowLimits;
+    std::array<double, 3> arrowLimits;
 
     // Triangle Data (is set up during constructing. No Node can exist without it)
     int myIndex;
@@ -58,6 +67,7 @@ struct ExtStr2 {
     std::array<double, 3> suggestedLengths;
 
     bool inwardsTriangle;
+    double score;
 
     TriangleNode3D(int idxC1_p,
                          int idxC2_p,
@@ -65,20 +75,29 @@ struct ExtStr2 {
                          Eigen::Vector3d corner_p,
                          std::array<Eigen::Vector3d, 3> arrows_p,
                          std::array<double, 3> suggestedLengths_p,
-                        bool inwardsTriangle_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(corner_p),arrows(arrows_p),suggestedLengths(suggestedLengths_p),inwardsTriangle(inwardsTriangle_p)
+                        bool inwardsTriangle_p,
+                        double score_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(corner_p),arrows(arrows_p),suggestedLengths(suggestedLengths_p),inwardsTriangle(inwardsTriangle_p),score(score_p)
     {
       possibilites = {std::vector<ExtStr2>(), std::vector<ExtStr2>(), std::vector<ExtStr2>()};
       chosen = {-1, -1, -1};
-      //arrowLimits = {std::numeric_limits<double>::max(),
-      //                  std::numeric_limits<double>::max(),
-      //                  std::numeric_limits<double>::max()};
+      arrowLimits = {std::numeric_limits<double>::max(),
+                        std::numeric_limits<double>::max(),
+                        std::numeric_limits<double>::max()};
     }
 
     // Note: might not work in every room-case because
     //       if a2 or a3 don't work, we should go back and modify a1 (or a2/a1 in case of a3 doesn't work)
 
-    bool recursiveGraphTraversal(std::vector<TriangleNode3D>& allTriangles, int depth) {
+    // Returns true if worked and gives back made modifiations.
+    // Returns false if not worked and undoes all made modifiactions (so no mods are returned)
+    bool recursiveGraphTraversal(std::vector<TriangleNode3D>& allTriangles, int depth, RecursionModifiactions& res_modific, bool allowPastLimit) {
       if (isInvalid()) return false;
+
+      std::array<RecursionModifiactions, 3> myModifications = {
+        RecursionModifiactions(),
+        RecursionModifiactions(),
+        RecursionModifiactions()
+      };
 
       // Iterate over all 3 arrows and look for the 3 next cornerpoints stored in "chosen".
       for (int i = 0; i < 3; i++) {
@@ -90,60 +109,93 @@ struct ExtStr2 {
         if (chosen[i] == -1) {
 
           bool found = false;
+          bool collision = false;
           for (int j = 0; j < possibilites[i].size(); j++) {
-            chosen[i] = j;
-            int chosenReturn = allTriangles[possibilites[i][chosen[i]].opposingTriangle].setChosen(possibilites[i][chosen[i]]);
-            if (chosenReturn == 1) break;         // We got an endpoint. Dont follow recursion anymore trough this link
-            if (chosenReturn == 2) {chosen[i] = -1; return false;}  // We got a collision. Don't follow recursion and pass error back.
-
+            if (!allowPastLimit && possibilites[i][j].dist > arrowLimits[i]) continue;
+            int res = checkPossibility(i, j, myModifications[i], allTriangles, depth, false);
+            if (res == 1) {found = true; break;}
+            if (res == 2) {collision = true; break;}
+          }
+          if (!collision && !found) {
             printDepthIndent(depth);
-            std::cout << "CurrIdx:" << myIndex << ", " << chosen[0] << "/" << possibilites[0].size() << ", "
-                      << chosen[1] << "/" << possibilites[1].size() << ", "
-                      << chosen[2] << "/" << possibilites[2].size() << "\n";
-            bool recOk = allTriangles[possibilites[i][chosen[i]].opposingTriangle].recursiveGraphTraversal(allTriangles, depth+1);
-            std::cout << "Recursion ended with: " << recOk << "\n";
-            if (recOk) {
-              found = true;
-              break;
-            } else {
-              allTriangles[possibilites[i][chosen[i]].opposingTriangle].removeChosen(possibilites[i][chosen[i]]);
+            std::cout << "Im " << myIndex << ", my followers didn't find anything for arrow " << i << " and I'm going to allow them now going past the limit.\n";
+            for (int j = 0; j < possibilites[i].size(); j++) {
+              if (!allowPastLimit && possibilites[i][j].dist > arrowLimits[i]) continue;
+              int res = checkPossibility(i, j, myModifications[i], allTriangles, depth, true);
+              if (res == 1) {found = true; break;}
+              if (res == 2) {break;}
             }
           }
 
-          if (!found) {chosen[i] = -1; return false;}
+          if (!found) {
+            rollbackMods(allTriangles, myModifications[0]);
+            rollbackMods(allTriangles, myModifications[1]);
+            rollbackMods(allTriangles, myModifications[2]);
+            printDepthIndent(depth);
+            std::cout << "CurrIdx:" << myIndex << ", ended by all tested / collision";
+            std::cout << "Rolled back " << (myModifications[0].mods.size() + myModifications[1].mods.size() + myModifications[2].mods.size()) << "Mods\n";
+            return false;
+          }
         }
       }
 
+      printDepthIndent(depth);
+      std::cout << "CurrIdx:" << myIndex << ", We found 3 chosens: " << possibilites[0][chosen[0]].opposingTriangle << ","
+                << possibilites[1][chosen[1]].opposingTriangle << ","
+                << possibilites[2][chosen[2]].opposingTriangle << "\n";
 
-      /*if (a2_chosen == -1) {
-        a2_chosen = 0;
-        while (!a2_possibilites[a2_chosen].triangle.recursiveGraphTraversal(allTriangles)) {
-          a2_chosen++;
-          if (a2_chosen >= a2_possibilites.size())
-            return false;
-        }
-      }
-
-      if (a3_chosen == -1) {
-        a3_chosen = 0;
-        while (!a3_possibilites[a3_chosen].triangle.recursiveGraphTraversal(allTriangles)) {
-          a3_chosen++;
-          if (a3_chosen >= a3_possibilites.size())
-            return false;
-        }
-      }*/
+      res_modific.mods.insert(res_modific.mods.end(), myModifications[0].mods.begin(), myModifications[0].mods.end());
+      res_modific.mods.insert(res_modific.mods.end(), myModifications[1].mods.begin(), myModifications[1].mods.end());
+      res_modific.mods.insert(res_modific.mods.end(), myModifications[2].mods.begin(), myModifications[2].mods.end());
       return true;
-
     }
+
+    void rollbackMods(std::vector<TriangleNode3D>& allTriangles, RecursionModifiactions mods) {
+      for (ModifiactionElement me : mods.mods) {
+        allTriangles[me.trianlgeIdx].chosen[me.chosenIdx] = -1;
+      }
+    }
+
+
+    // 0: Possibility didn't work out
+    // 1: Possibility was a success
+    // 2: Possibility was a collision (didn't work out, and we want to quit early s.t. we don't link arrows over other arrows)
+    int checkPossibility(int i, int j, RecursionModifiactions& myModifications, std::vector<TriangleNode3D>& allTriangles, int depth, bool allowPastL) {
+      chosen[i] = j;
+      myModifications.mods.push_back({myIndex, i});
+      int chosenReturn = allTriangles[possibilites[i][chosen[i]].opposingTriangle].setChosen(possibilites[i][chosen[i]], myModifications);
+      if (chosenReturn == 1) {return 1;}         // We got an endpoint. Dont follow recursion anymore trough this link
+      if (chosenReturn == 2) {return 2;}  // We got a collision. Don't follow recursion and pass error back.
+
+      printDepthIndent(depth);
+      std::cout << "CurrIdx:" << myIndex << ", " << chosen[0] << "/" << possibilites[0].size() << ", "
+                << chosen[1] << "/" << possibilites[1].size() << ", "
+                << chosen[2] << "/" << possibilites[2].size() << "\n";
+
+
+      bool recOk = allTriangles[possibilites[i][chosen[i]].opposingTriangle].recursiveGraphTraversal(allTriangles, depth+1, myModifications, allowPastL);
+      printDepthIndent(depth);
+      std::cout << "Recursion ended with: " << recOk << "\n";
+      if (recOk) {
+        return 1;
+      } else {
+        rollbackMods(allTriangles, myModifications);
+        return 0;
+      }
+    }
+
+
+
 
     // 0: was empty, now it's set
     // 1: was already set to this corner.
     // 2: was already set to another corner.
-    int setChosen(ExtStr2 es) {
+    int setChosen(ExtStr2 es, RecursionModifiactions& mods) {
       for (int i = 0; i < possibilites[es.opposingArrow].size(); i++) {
         if (possibilites[es.opposingArrow][i].opposingTriangle == es.myTriangle) {
           if (chosen[es.opposingArrow] == -1) {
             chosen[es.opposingArrow] = i;
+            mods.mods.push_back({myIndex, es.opposingArrow});
             return 0;
           } else if (chosen[es.opposingArrow] == i) {
             return 1;
@@ -186,9 +238,9 @@ struct ExtStr2 {
               // Limit the possible followers if there is a triangle looking in the same direction as the arrow
               // Check if arrows are like this:   <----S    <---M, and not <-----M   <---S
               // For this, M+arrow to S must be smaller than M to S  (Note: M: main, S: second/follower)
-              //if (calcDistance(this->corner + this->arrows[myArrowIdx], t.corner)   < calcDistance(this->corner, t.corner)) {
-              //  arrowLimits[myArrowIdx] = std::min(arrowLimits[myArrowIdx], calcDistance(this->corner, t.corner));
-              //}
+              if (calcDistance(this->corner + this->arrows[myArrowIdx], t.corner)   < calcDistance(this->corner, t.corner)) {
+                arrowLimits[myArrowIdx] = std::min(arrowLimits[myArrowIdx], calcDistance(this->corner, t.corner));
+              }
             }
           }
         }
@@ -196,17 +248,18 @@ struct ExtStr2 {
     }
 
 
-    void sortPossibilities() {
+    void sortPossibilities(const std::vector<TriangleNode3D>& allTriangles) {
 
       // Returns true if e1 is better than e2
-      const auto comparePoss{[this](ExtStr2 e1, ExtStr2 e2) -> bool {
+      const auto comparePoss{[this, allTriangles](ExtStr2 e1, ExtStr2 e2) -> bool {
         //if (e1.dist > arrowLimits[e1.myArrow] && e2.dist <= arrowLimits[e2.myArrow]) return false; // if e1 is out of limit and e2 is not, prefer e2
         //if (e1.dist <= arrowLimits[e1.myArrow] && e2.dist > arrowLimits[e2.myArrow]) return false; // other way around
 
         // If the difference is very small, we prefer a longer arrow (otherwise, what are we doing to do with the second arrow?)
         // TODO: Maybe the second one is the wrong arrow. Compare scores of arrow to determine which is better.
-        if (std::abs(e1.dist - e2.dist) < 0.5) {
-          return e1.dist > e2.dist;
+        if (std::abs(e1.dist - e2.dist) < 0.8) {
+          //return e1.dist > e2.dist;
+          return allTriangles[e1.opposingTriangle].score > allTriangles[e2.opposingTriangle].score;
         }
         return e1.dist < e2.dist;
       }};
@@ -277,7 +330,7 @@ struct ExtStr2 {
 
       for (int idx : {idxC1, idxC2, idxC3}) {
         if (!clusterPolygonsContainCluster(polygons, idx)) {
-          std::cout << "CLGEN: By: " << myIndex << ", ClIdx: " << idx;
+          std::cout << "CLGEN: By: " << myIndex << ", ClIdx: " << idx << "\n";
           ClusterPolygon newOne{idx, std::vector<int>()};
           ExtStr2 link = findNextExtStr2Plane(idx, -1);
           iterateOverClusterContour(allTriangles, link, myIndex, idx, newOne, possibleFollowups, dones);
@@ -288,13 +341,14 @@ struct ExtStr2 {
     }
 
     ExtStr2 findNextExtStr2Plane(int clusterIndex, int comingFrom) {
-      std::cout << "Looking for cluster " << clusterIndex << "\n";
+      std::cout << "I'm " << myIndex << ", Looking for cluster " << clusterIndex << "\n";
       std::cout << "MyLinks: ";
       printExtStr2(possibilites[0][chosen[0]]);
       std::cout << ",";
       printExtStr2(possibilites[1][chosen[1]]);
       std::cout << ",";
       printExtStr2(possibilites[2][chosen[2]]);
+      std::cout << "chosens: " << chosen[0] << "," << chosen[1] << "," << chosen[2];
       std::cout << ", Clusters: ";
       std::cout << idxC1 << "," << idxC2 << "," << idxC3;
       std::cout << ", from:" << comingFrom << "\n";
@@ -317,6 +371,8 @@ struct ExtStr2 {
           return possibilites[2][chosen[2]];
         }
       }
+      std::cout << "findNextExtStr2Plane Exception";
+      exit(0);
       throw "findNextExtStr2Plane Exception";
     }
 
