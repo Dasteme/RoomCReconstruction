@@ -327,16 +327,16 @@ public:
     return false;
   }
 
-
+*/
   void recalculatePLANE(const Eigen::Matrix<double, 3, Eigen::Dynamic> &allPoints) {
     TangentSpace::LocalPCA pca = TangentSpace::computePCA(allPoints, points);
     const double planarPointScore = 1 - (pca.eigenvalues.z() / pca.eigenvalues.y());
 
     std::cout << "Planarity: " << planarPointScore << "\n";
     if (planarPointScore > 0.9) {
-      normal = pca.local_base.col(2);
+      normal = pca.local_base.col(2).normalized();
     }
-  }*/
+  }
 };
 
 }

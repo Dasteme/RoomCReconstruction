@@ -223,7 +223,9 @@ namespace RoomCReconstruction {
       std::sort(clusters.begin(), clusters.end(), compareCluster);
 
 
-
+      for (int i = 0; i < clusters.size(); i++) {
+        clusters[i].recalculatePLANE(points);
+      }
 
       // Code for coloring clusters according to their index for easier debugging.
       // It works for around 65'000 clusters, in contrast to the easier coloring further down
@@ -258,6 +260,9 @@ namespace RoomCReconstruction {
               //std::cout << biggerC.mergedCluster;
               if (biggerC.mergedCluster || smallerC.mergedCluster) continue;
               biggerC.tryMergeCluster(smallerC, mergReq.distMerging, mergReq.angleFracMerging, mergReq.reqPoints, mergReq.requireCloseness);
+              if (smallerC.mergedCluster) {
+                biggerC.recalculatePLANE(points);
+              }
               //biggerC.mergingNew(smallerC, mergReq.distMerging, mergReq.reqPoints, mergReq.requireCloseness);
 //              if (smallerC.mergedCluster) {
 //                if (videoCounterCluster++ > 30) {
@@ -596,7 +601,7 @@ namespace RoomCReconstruction {
       TriangleAttempt ta(idxC1, idxC2, idxC3);
 
       // For debugging
-      if (idxC1 == 5 && idxC2 == 38 && idxC3 == 41) {
+      if (idxC1 == 0 && idxC2 == 7 && idxC3 == 11) {
         ta.debugIt = true;
       }
 

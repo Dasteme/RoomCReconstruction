@@ -7,6 +7,7 @@
 #include "Helper.hpp"
 #include "queue"
 #include "ts/pc/pc_tools.hpp"
+#include "rcr_io.hpp"
 #include <iostream>
 
 namespace RoomCReconstruction {
@@ -40,6 +41,8 @@ struct ExtStr2 {
   int myArrow;
   int opposingArrow;
 };
+
+static int vid_counter = 0;
 
   class TriangleNode3D {
   public:
@@ -162,6 +165,46 @@ struct ExtStr2 {
     // 2: Possibility was a collision (didn't work out, and we want to quit early s.t. we don't link arrows over other arrows)
     int checkPossibility(int i, int j, RecursionModifiactions& myModifications, std::vector<TriangleNode3D>& allTriangles, int depth, bool allowPastL) {
       chosen[i] = j;
+
+
+
+
+      // Video for triangle-linking
+      /*std::vector<Eigen::Vector3d> arrows;
+      std::vector<std::array<unsigned char, 3>> arrowColors;
+
+      for (int i = 0; i < allTriangles.size(); i++) {
+        if (allTriangles[i].chosen[0] == -1 && allTriangles[i].chosen[1] == -1 && allTriangles[i].chosen[2] == -1) continue;
+        TriangleNode3D& t = allTriangles[i];
+        arrows.push_back(t.corner);
+        arrows.push_back(t.corner+ t.suggestedLengths[0]  *t.arrows[0]);
+        arrows.push_back(t.corner);
+        arrows.push_back(t.corner+ t.suggestedLengths[1]  *t.arrows[1]);
+        arrows.push_back(t.corner);
+        arrows.push_back(t.corner+ t.suggestedLengths[2]  *t.arrows[2]);
+
+        // Colors: Center is red if inwards, blue if outwards. Last index is triangle index.
+        //         Arrow-endpoints contain arrow-index at last position
+        arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(0)});
+        arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(1)});
+        arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+        arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(2)});
+      }
+      writeEdgesWColors("video_A_video_step3_" + formatInteger(vid_counter++, 12) + ".ply", arrows, arrowColors);
+*/
+
+
+
+
+
+
+
+
+
+
+
       myModifications.mods.push_back({myIndex, i});
       int chosenReturn = allTriangles[possibilites[i][chosen[i]].opposingTriangle].setChosen(possibilites[i][chosen[i]], myModifications);
       if (chosenReturn == 1) {return 1;}         // We got an endpoint. Dont follow recursion anymore trough this link
