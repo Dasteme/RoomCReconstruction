@@ -1,17 +1,25 @@
 #include "ts/pc/pc_io.hpp"
-#include "wallextender.hpp"
+#include "Cluster.hpp"
 #include "Helper.hpp"
+#include "SpecialPrinter.hpp"
+#include "TriangleAttempt.hpp"
 
 #include "tinyply/tinyply.hpp"
 
 #include <chrono>
 #include <iostream>
 
+using namespace RoomCReconstruction;
+
 int main(int argc, const char* argv[]) {
 
   // Note: The smaller irregularities you can accept and the bigger walls you can accept, the more exact the result is going to be.
   //       In the extreme case where you need for example 10cm wall-irregularities and also need walls as small as 10cm, we are not going to
   //       be able to differentiate between real walls and wall-irregularities.
+  //
+  //  Assertions: Point cloud with meter scale
+  //
+  //
     constexpr double req_supported_wallirregularities = 0.006;  // 8mm  (between highest and lowest point in wall, )
     constexpr double req_supported_minwalllen = 0.1;
 
@@ -115,8 +123,82 @@ int main(int argc, const char* argv[]) {
     std::cout << "Local pca decomposition computation time: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl << std::endl;
 
 
+
+
+    // ****************************************
     // Clustering
-    RoomCReconstruction::extendWallpoint(search_tree, loaded_points, local_pcas, avg_spacing, diff_proportion, max_possible_rec_angle);
+    // ****************************************
+    time_measure = std::chrono::high_resolution_clock::now();
+
+    // Generate clusters
+    std::vector <Cluster> clusters = generateClusters(search_tree, loaded_points, local_pcas, diff_proportion, max_possible_rec_angle);
+    std::cout << "Found " << clusters.size() << " Clusters\n";
+    printPointsWRTClusters("output_clustering_1_initial.ply", loaded_points, clusters);
+
+    // sort clusters s.t. small clusters are first merged to bigger ones
+    sortClusters(clusters);
+
+    // Merge clusters to put similar clusters together
+    mergeClusters(clusters, loaded_points, max_possible_rec_angle);
+    std::cout << clusters.size() << " Clusters after merging\n";
+    printPointsWRTClusters("output_clustering_2_after_merging.ply", loaded_points, clusters);
+
+    // Remove small clusters
+    removeSmallClusters(clusters);
+    std::cout << clusters.size() << " Clusters after removing small ones\n";
+    printPointsWRTClusters("output_clustering_3_after_removingSmallones.ply", loaded_points, clusters);
+
+
+    // For debugging
+    changeClusterColorsAccordingToIndices(clusters);
+    printPointsWRTClusters("output_clustering_4_MAIN_with_colors_accoring_to_indexes.ply", loaded_points, clusters);
+    /*printMarkerpoints("output_clustering_5_markerPoints.ply", clusters);
+    changeClusterColorsSpecifically(clusters);
+    printPointsWRTClusters("output_clustering_DEBUG_KEYCLUSTER.ply", loaded_points, clusters);*/
+
+
+    std::cout << "Clusters generated in: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl;
+
+
+
+
+    // ****************************************
+    // Triangle-finding
+    // ****************************************
+    time_measure = std::chrono::high_resolution_clock::now();
+
+    std::vector<TriangleNode3D> intersection_triangles = generateTriangles(clusters, loaded_points);
+
+    printArrows("output_clustering_6_arrows.ply", 0, false, intersection_triangles);
+    printArrows("output_clustering_7_arrows_small.ply", 0.1, false, intersection_triangles);
+
+    std::cout << "Triangles found in: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl;
+
+
+
+    // ****************************************
+    // Triangle-linking
+    // ****************************************
+    time_measure = std::chrono::high_resolution_clock::now();
+
+    // Setup links between triangles
+    setupLinks(intersection_triangles);
+    printArrows("output_clustering_8_arrows_linked.ply", 0, true, intersection_triangles);
+    printArrows("output_clustering_9_arrows_linked_small.ply", 0.1, true, intersection_triangles);
+    consoleTriangles(intersection_triangles, false);
+
+    // Link the triangles and output first result
+    LinkedRoom room = linkTriangles(clusters, intersection_triangles);
+
+    std::cout << "Triangles linked in: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl;
+
+
+
+    // ****************************************
+    // Print the found room (create a mesh)
+    // ****************************************
+    printLinkedRoom("A_NEWRoom.ply",  room, clusters, intersection_triangles);
+
 
 
     std::cout << "Hello, World!" << std::endl;

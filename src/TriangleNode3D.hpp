@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "Cluster.hpp"
 #include "Helper.hpp"
 #include "queue"
 #include "ts/pc/pc_tools.hpp"
@@ -21,6 +22,8 @@ namespace RoomCReconstruction {
     int idxCluster;
     std::vector<int> triangles;
   };
+
+  using LinkedRoom = std::vector<ClusterPolygon>;
 
   struct ModifiactionElement {
     int trianlgeIdx;
@@ -492,4 +495,6 @@ static int vid_counter = 0;
   };
 
 
+  void setupLinks(std::vector<TriangleNode3D>& intersection_triangles);
+  LinkedRoom linkTriangles(std::vector <Cluster>& clusters, std::vector<TriangleNode3D>& intersection_triangles);
 }

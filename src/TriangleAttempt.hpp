@@ -6,6 +6,7 @@
 #include "Cluster.hpp"
 #include "Helper.hpp"
 #include "ts/pc/pc_tools.hpp"
+#include "TriangleNode3D.hpp"
 #include "rcr_io.hpp"
 
 #include <array>
@@ -521,6 +522,10 @@ public:
 
   }*/
 };
+
+
+std::vector<TriangleNode3D> generateTriangles(std::vector<Cluster> clusters, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points);
+bool checkSomewhatOrthogonal(Cluster c1, Cluster c2);
 
 
 }

@@ -757,4 +757,10 @@ void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::
         if (p[1] > 0) {res[0]++;} else {res[1]++;}
       }
     }
+Eigen::Vector3d rotateAround(Eigen::Vector3d toRotate, Eigen::Vector3d aroundRotate) {
+      Eigen::AngleAxis<double> rotationMatrix(0.5*std::numbers::pi_v<double>, aroundRotate);
+      return rotationMatrix * toRotate;
+    }
+
 void calculateArrowValue(Cluster c1, Cluster c2, Eigen::Vector3d corner, Eigen::Vector3d arrow, std::array<int, 2> res); // In .hpp
+Eigen::Vector3d rotateAround(Eigen::Vector3d toRotate, Eigen::Vector3d aroundRotate);                                    // In .hpp
