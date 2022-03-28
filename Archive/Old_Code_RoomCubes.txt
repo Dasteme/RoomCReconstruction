@@ -1,0 +1,152 @@
+RoomCubes was a approach to fill the scene with cubes of 10m^3.
+Every cube that has at least one point is "filled".
+The concept tried to use the fact that every room has a ceiling and floor somewhere.
+Between should be nothing. With this, it was very easy to remove furniture. Everything that was not
+on the bottom and had a filled cube above it was considered to be furniture.
+This approach could even be used in the current algorithm to exclude furniture. However it wouldn't be possible anymore
+to have multiple floor-heights. Moreover, overhanging walls would also not be possible anymore.
+
+
+
+class RoomCube {
+public:
+
+  double posX;
+  double posY;
+  double posZ;
+  double width;
+
+  RoomCube *right;
+  RoomCube *left;
+  RoomCube *front;
+  RoomCube *back;
+  RoomCube *up;
+  RoomCube *down;
+
+  std::vector <size_t> points;
+
+  RoomCube() {}
+
+  void init(double posX_p, double posY_p, double posZ_p, double width_p) {
+    posX = posX_p;
+    posY = posY_p;
+    posZ = posZ_p;
+    width = width_p;
+  }
+
+  void addPoint(size_t index) {
+    points.push_back(index);
+  }
+
+  void toMesh(std::vector<Eigen::Vector3d>& vertices, std::vector<std::uint32_t>& faces) {
+    std::vector<Eigen::Vector2d> polygon;
+    polygon.push_back(Eigen::Vector2d(posX-width/2, posY-width/2));
+    polygon.push_back(Eigen::Vector2d(posX-width/2, posY+width/2));
+    polygon.push_back(Eigen::Vector2d(posX+width/2, posY+width/2));
+    polygon.push_back(Eigen::Vector2d(posX+width/2, posY-width/2));
+    polygon2dToRoom(polygon, posZ-width/2, posZ+width/2, vertices, faces);
+  }
+
+};
+
+
+
+
+
+
+
+
+// In wallextender.cpp, generating the cubes after generating clusters:
+
+
+ double cubesSize = 0.1;
+      BoundingBox bb;
+
+      for (int i = 0; i != local_pcas.size(); ++i) {
+        if (points.col(static_cast<Eigen::Index>(i))[0] < bb.minX) {bb.minX = points.col(static_cast<Eigen::Index>(i))[0]; }
+        if (points.col(static_cast<Eigen::Index>(i))[1] < bb.minY) {bb.minY = points.col(static_cast<Eigen::Index>(i))[1]; }
+        if (points.col(static_cast<Eigen::Index>(i))[2] < bb.minZ) {bb.minZ = points.col(static_cast<Eigen::Index>(i))[2]; }
+        if (points.col(static_cast<Eigen::Index>(i))[0] > bb.maxX) {bb.maxX = points.col(static_cast<Eigen::Index>(i))[0]; }
+        if (points.col(static_cast<Eigen::Index>(i))[1] > bb.maxY) {bb.maxY = points.col(static_cast<Eigen::Index>(i))[1]; }
+        if (points.col(static_cast<Eigen::Index>(i))[2] > bb.maxZ) {bb.maxZ = points.col(static_cast<Eigen::Index>(i))[2]; }
+      }
+      std::cout << "X: [" << bb.minX << "," << bb.maxX << "]\n";
+      std::cout << "Y: [" << bb.minY << "," << bb.maxY << "]\n";
+      std::cout << "Z: [" << bb.minZ << "," << bb.maxZ << "]\n";
+
+      double roomDistX = bb.maxX-bb.minX;
+      double roomDistY = bb.maxY-bb.minY;
+      double roomDistZ = bb.maxZ-bb.minZ;
+      int rCX = std::ceil((roomDistX) / cubesSize);
+      int rCY = std::ceil((roomDistY) / cubesSize);
+      int rCZ = std::ceil((roomDistZ) / cubesSize);
+
+      std::cout << "Generating Cubes... " << rCX << "," << rCY << "," << rCZ << "\n";
+
+      /*std::vector<std::vector<std::vector<RoomCube>>> roomCubes123(rCX,
+                                                                   std::vector<std::vector<RoomCube>>(rCY,
+                                                                                                      std::vector<RoomCube>(rCZ) ));
+      for (double xIter = 0; xIter < rCX; xIter+=cubesSize) {
+        for (double yIter = 0; yIter < rCY; yIter+=cubesSize) {
+          for (double zIter = 0; zIter < rCZ; zIter+=cubesSize) {
+
+            //std::cout << "Accessing" << xIter << "," << yIter << "," << zIter << "\n";
+            roomCubes123[xIter][yIter][zIter].init(bb.minX+xIter*cubesSize, bb.minY+yIter*cubesSize, bb.minZ+zIter*cubesSize, cubesSize);
+          }
+        }
+      }*/
+
+/*
+      std::cout << "Add points to Cubes...\n";
+
+      for (int i = 0; i != clusters.size(); ++i) {
+        for (int j = 0; j < clusters[i].pointsReal.size(); j++) {
+          auto pnt = clusters[i].pointsReal[j];
+          int pntX = std::floor((pnt[0]-minX) / cubesSize);
+          int pntY = std::floor((pnt[1]-minY) / cubesSize);
+          int pntZ = std::floor((pnt[2]-minZ) / cubesSize);
+          //std::cout << "Accessing" << pntX << "," << pntY << "," << pntZ << "\n";
+          roomCubes123[pntX][pntY][pntZ].addPoint(j);
+
+          clusters[i].addSupportiveRoomCube(pntX, pntY, pntZ);
+        }
+
+      }
+*/
+
+/*
+      for (int i = 0; i < rCX; i++) {
+        for (int j = 0; j < rCY; j++) {
+          for (int k = 0; k < rCZ; k++) {
+          }
+        }
+      }*/
+
+
+
+
+      std::cout << "Parsing Cubes...\n";
+      std::vector<Eigen::Vector3d> vertices;
+      std::vector<std::uint32_t> faces;
+
+      /*for (int i = 0; i < rCX; i++) {
+        for (int j = 0; j < rCY; j++) {
+          bool found = false;
+          bool recentFound = false;
+          for (int k = rCZ-1; k >= 0; k--) {
+            std::vector<Eigen::Vector3d> vertices2;
+            std::vector<std::uint32_t> faces2;
+            if (roomCubes123[i][j][k].points.size() > 0 && (!found || k==0||k==1 || recentFound)) {
+              found = true;
+              recentFound = true;
+              roomCubes123[i][j][k].toMesh(vertices2, faces2);
+              appendVerticesFaces(vertices, faces, vertices2, faces2);
+            } else {
+              recentFound = false;
+            }
+          }
+        }
+      }*/
+
+
+      //writePointsWithFaces("A_Cubes.ply", vertices, faces);

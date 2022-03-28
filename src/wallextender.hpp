@@ -33,53 +33,6 @@ namespace RoomCReconstruction {
 
 
 
-class RoomCube {
-public:
-
-  double posX;
-  double posY;
-  double posZ;
-  double width;
-
-  RoomCube *right;
-  RoomCube *left;
-  RoomCube *front;
-  RoomCube *back;
-  RoomCube *up;
-  RoomCube *down;
-
-  std::vector <size_t> points;
-
-  RoomCube() {}
-
-  void init(double posX_p, double posY_p, double posZ_p, double width_p) {
-    posX = posX_p;
-    posY = posY_p;
-    posZ = posZ_p;
-    width = width_p;
-  }
-
-  void addPoint(size_t index) {
-    points.push_back(index);
-  }
-
-  void toMesh(std::vector<Eigen::Vector3d>& vertices, std::vector<std::uint32_t>& faces) {
-    std::vector<Eigen::Vector2d> polygon;
-    polygon.push_back(Eigen::Vector2d(posX-width/2, posY-width/2));
-    polygon.push_back(Eigen::Vector2d(posX-width/2, posY+width/2));
-    polygon.push_back(Eigen::Vector2d(posX+width/2, posY+width/2));
-    polygon.push_back(Eigen::Vector2d(posX+width/2, posY-width/2));
-    polygon2dToRoom(polygon, posZ-width/2, posZ+width/2, vertices, faces);
-  }
-
-};
-
-
-
-
-
-
-
 
 
 bool checkSomewhatOrthogonal(Cluster c1, Cluster c2);

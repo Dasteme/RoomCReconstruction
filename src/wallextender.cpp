@@ -203,14 +203,6 @@ namespace RoomCReconstruction {
 
 
 
-      /*for (Cluster c : clusters) {
-        c.calculatePlaneExtension();
-      }*/
-
-
-
-
-
 
 
 
@@ -263,7 +255,6 @@ namespace RoomCReconstruction {
               if (smallerC.mergedCluster) {
                 biggerC.recalculatePLANE(points);
               }
-              //biggerC.mergingNew(smallerC, mergReq.distMerging, mergReq.reqPoints, mergReq.requireCloseness);
 //              if (smallerC.mergedCluster) {
 //                if (videoCounterCluster++ > 30) {
 //                  printPointsWRTClusters("./video_A_video_step2_" + formatInteger(video_mergingCounter++, 12)  + ".ply", points, clusters, colors);
@@ -304,13 +295,6 @@ namespace RoomCReconstruction {
       printPointsWRTClusters("output_clustering_3_after_removingSmallones.ply", points, clusters, colors);
 
 
-      /*for (Cluster c : clusters) {
-        c.calculatePlaneExtension();
-        std::cout << "Cluster extension: " << c.negativeExtend << ", " << c.maximumExtend << "\n";
-        //c.recalculatePLANE(points);
-      }*/
-
-
 
       for (int i = 0; i < clusters.size(); i++) {
         clusters[i].color[2] = i;
@@ -326,10 +310,7 @@ namespace RoomCReconstruction {
 
 
 
-
-      double cubesSize = 0.1;
       BoundingBox bb;
-
       for (int i = 0; i != local_pcas.size(); ++i) {
         if (points.col(static_cast<Eigen::Index>(i))[0] < bb.minX) {bb.minX = points.col(static_cast<Eigen::Index>(i))[0]; }
         if (points.col(static_cast<Eigen::Index>(i))[1] < bb.minY) {bb.minY = points.col(static_cast<Eigen::Index>(i))[1]; }
@@ -338,89 +319,6 @@ namespace RoomCReconstruction {
         if (points.col(static_cast<Eigen::Index>(i))[1] > bb.maxY) {bb.maxY = points.col(static_cast<Eigen::Index>(i))[1]; }
         if (points.col(static_cast<Eigen::Index>(i))[2] > bb.maxZ) {bb.maxZ = points.col(static_cast<Eigen::Index>(i))[2]; }
       }
-      std::cout << "X: [" << bb.minX << "," << bb.maxX << "]\n";
-      std::cout << "Y: [" << bb.minY << "," << bb.maxY << "]\n";
-      std::cout << "Z: [" << bb.minZ << "," << bb.maxZ << "]\n";
-
-      double roomDistX = bb.maxX-bb.minX;
-      double roomDistY = bb.maxY-bb.minY;
-      double roomDistZ = bb.maxZ-bb.minZ;
-      int rCX = std::ceil((roomDistX) / cubesSize);
-      int rCY = std::ceil((roomDistY) / cubesSize);
-      int rCZ = std::ceil((roomDistZ) / cubesSize);
-
-      std::cout << "Generating Cubes... " << rCX << "," << rCY << "," << rCZ << "\n";
-
-      /*std::vector<std::vector<std::vector<RoomCube>>> roomCubes123(rCX,
-                                                                   std::vector<std::vector<RoomCube>>(rCY,
-                                                                                                      std::vector<RoomCube>(rCZ) ));
-      for (double xIter = 0; xIter < rCX; xIter+=cubesSize) {
-        for (double yIter = 0; yIter < rCY; yIter+=cubesSize) {
-          for (double zIter = 0; zIter < rCZ; zIter+=cubesSize) {
-
-            //std::cout << "Accessing" << xIter << "," << yIter << "," << zIter << "\n";
-            roomCubes123[xIter][yIter][zIter].init(bb.minX+xIter*cubesSize, bb.minY+yIter*cubesSize, bb.minZ+zIter*cubesSize, cubesSize);
-          }
-        }
-      }*/
-
-/*
-      std::cout << "Add points to Cubes...\n";
-
-      for (int i = 0; i != clusters.size(); ++i) {
-        for (int j = 0; j < clusters[i].pointsReal.size(); j++) {
-          auto pnt = clusters[i].pointsReal[j];
-          int pntX = std::floor((pnt[0]-minX) / cubesSize);
-          int pntY = std::floor((pnt[1]-minY) / cubesSize);
-          int pntZ = std::floor((pnt[2]-minZ) / cubesSize);
-          //std::cout << "Accessing" << pntX << "," << pntY << "," << pntZ << "\n";
-          roomCubes123[pntX][pntY][pntZ].addPoint(j);
-
-          clusters[i].addSupportiveRoomCube(pntX, pntY, pntZ);
-        }
-
-      }
-*/
-
-/*
-      for (int i = 0; i < rCX; i++) {
-        for (int j = 0; j < rCY; j++) {
-          for (int k = 0; k < rCZ; k++) {
-          }
-        }
-      }*/
-
-
-
-
-      std::cout << "Parsing Cubes...\n";
-      std::vector<Eigen::Vector3d> vertices;
-      std::vector<std::uint32_t> faces;
-
-      /*for (int i = 0; i < rCX; i++) {
-        for (int j = 0; j < rCY; j++) {
-          bool found = false;
-          bool recentFound = false;
-          for (int k = rCZ-1; k >= 0; k--) {
-            std::vector<Eigen::Vector3d> vertices2;
-            std::vector<std::uint32_t> faces2;
-            if (roomCubes123[i][j][k].points.size() > 0 && (!found || k==0||k==1 || recentFound)) {
-              found = true;
-              recentFound = true;
-              roomCubes123[i][j][k].toMesh(vertices2, faces2);
-              appendVerticesFaces(vertices, faces, vertices2, faces2);
-            } else {
-              recentFound = false;
-            }
-          }
-        }
-      }*/
-
-
-      //writePointsWithFaces("A_Cubes.ply", vertices, faces);
-
-
-
 
 
 
@@ -440,8 +338,6 @@ namespace RoomCReconstruction {
         }
       }
       printPointsWRTClusters("output_clustering_DEBUG_KEYCLUSTER.ply", points, clusters, colors);
-
-
 
 
 

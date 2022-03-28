@@ -29,10 +29,6 @@ public:
 
   std::vector<std::array<int, 3>> supportiveCubes;
 
-  //double negativeExtend = 0;
-  //double maximumExtend = 0;
-
-
   Cluster()
   {
     color[0] = rand() % 256;
@@ -144,49 +140,6 @@ public:
   double calcDistanceToCenter(Eigen::Vector3d vec1) { return calcDistance(vec1, center); }
 
 
-  /*void mergingNew(Cluster& toMergeCluster,
-  double dist,
-  double reqPercent,
-  double requireCloseness)
-  {
-    if (requireCloseness >= 0 && distanceToOtherCluster(toMergeCluster) > requireCloseness) {return;}
-    double unnec_dist_p = -1;
-
-    int possibleMergePoints = 0;
-    for (int i = 0; i < toMergeCluster.markerPoints.size(); i++) {
-      if (isWithinPlaneExtension(toMergeCluster.markerPoints[i], 0.05)) {possibleMergePoints++;}
-    }
-
-    if (possibleMergePoints / toMergeCluster.markerPoints.size() >= reqPercent) {
-
-      for (int i = 0; i < toMergeCluster.points.size(); i++) {
-
-        if (checkAdd(
-          toMergeCluster.center, toMergeCluster.normal, 0.05, 16, unnec_dist_p)) {
-          // Todo: Consider adding without normal
-          Add(toMergeCluster.pointsReal[i],
-              toMergeCluster.pointsNormals[i],
-              toMergeCluster.points[i]);
-        } else if (checkAdd(toMergeCluster.center,
-                            -toMergeCluster.normal, 0.05, 16,
-                            unnec_dist_p)) {
-          // Todo: Consider adding without normal
-          Add(toMergeCluster.pointsReal[i],
-              -toMergeCluster.pointsNormals[i],
-              toMergeCluster.points[i]);
-        }// else {
-        //  addNoNormal(toMergeCluster.pointsReal[i], toMergeCluster.points[i]);
-        //}
-
-      }
-      markerPoints.insert(markerPoints.end(),
-                          toMergeCluster.markerPoints.begin(),
-                          toMergeCluster.markerPoints.end());
-      toMergeCluster.mergedCluster = true;
-      calculatePlaneExtension();
-    }
-  }*/
-
   void tryMergeCluster(Cluster& toMergeCluster,
                        double dist,
                        double angle_frac,
@@ -223,36 +176,7 @@ public:
         toMergeCluster.mergedCluster = true;
       }
 
-    }/* else {
-
-      int possibleMergePoints = 0;
-      for (int i = 0; i < toMergeCluster.pointsReal.size(); i++) {
-        if (isWithinPlaneExtension(toMergeCluster.pointsReal[i], 0.1)) {possibleMergePoints++;}
-      }
-
-      if (possibleMergePoints / toMergeCluster.pointsReal.size() >= reqPercent) {
-
-        for (int i = 0; i < toMergeCluster.points.size(); i++) {
-
-          Add(toMergeCluster.pointsReal[i],
-              toMergeCluster.normal,
-              toMergeCluster.points[i]);
-
-        }
-        markerPoints.insert(markerPoints.end(),
-                            toMergeCluster.markerPoints.begin(),
-                            toMergeCluster.markerPoints.end());
-        toMergeCluster.mergedCluster = true;
-        calculatePlaneExtension();
-      }
-
-    }*/
-
-
-
-
-
-    else {
+    } else {
 
       int possibleMergePoints = 0;
       for (int i = 0; i < toMergeCluster.points.size(); i++) {
@@ -311,23 +235,6 @@ public:
   }
 
 
-  /*void calculatePlaneExtension() {
-    negativeExtend = 0;
-    maximumExtend = 0;
-    for (Eigen::Vector3d& pr : pointsReal) {
-      double distance = (pr - center).dot(normal);
-      if (distance < negativeExtend) {negativeExtend = distance;}
-      if (distance > maximumExtend) {maximumExtend = distance;}
-    }
-  }
-
-  bool isWithinPlaneExtension(Eigen::Vector3d& p, double maxDist) {
-    double distance = (p - center).dot(normal);
-    if (distance >= (-maxDist) && distance <= (maxDist)) return true;
-    return false;
-  }
-
-*/
   void recalculatePLANE(const Eigen::Matrix<double, 3, Eigen::Dynamic> &allPoints) {
     TangentSpace::LocalPCA pca = TangentSpace::computePCA(allPoints, points);
     const double planarPointScore = 1 - (pca.eigenvalues.z() / pca.eigenvalues.y());
