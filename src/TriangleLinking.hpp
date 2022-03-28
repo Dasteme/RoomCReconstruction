@@ -4,11 +4,11 @@
 
 #pragma once
 
-#include "Cluster.hpp"
+#include "Clustering.hpp"
 #include "Helper.hpp"
 #include "queue"
-#include "ts/pc/pc_tools.hpp"
 #include "rcr_io.hpp"
+#include "ts/pc/pc_tools.hpp"
 #include <iostream>
 
 namespace RoomCReconstruction {

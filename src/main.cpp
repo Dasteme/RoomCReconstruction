@@ -1,8 +1,8 @@
-#include "ts/pc/pc_io.hpp"
-#include "Cluster.hpp"
+#include "Clustering.hpp"
 #include "Helper.hpp"
 #include "SpecialPrinter.hpp"
-#include "TriangleAttempt.hpp"
+#include "TriangleFinding.hpp"
+#include "ts/pc/pc_io.hpp"
 
 #include "tinyply/tinyply.hpp"
 

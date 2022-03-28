@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "Cluster.hpp"
-#include "TriangleNode3D.hpp"
+#include "Clustering.hpp"
+#include "TriangleLinking.hpp"
 #include "ts/pc/pc_io.hpp"
 #include <iostream>
 
