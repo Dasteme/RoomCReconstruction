@@ -5,12 +5,9 @@
 #include "Helper.hpp"
 #include "rcr_io.hpp"
 
-#include <cstring>
 #include <fstream>
 #include <iostream>
-#include <memory>
 #include <stdexcept>
-#include <string_view>
 
 
 namespace RoomCReconstruction {

@@ -13,13 +13,6 @@
 #include <iostream>
 
 namespace RoomCReconstruction {
-  struct ExtStr {
-    int intersectionIdx;
-    double dist;
-    int myArrow;
-    int opposingArrow;
-  };
-
 
   void setupLinks(std::vector<TriangleNode3D>& intersection_triangles);
   LinkedRoom linkTriangles(std::vector <Cluster>& clusters, std::vector<TriangleNode3D>& intersection_triangles);

@@ -168,13 +168,12 @@ void mergeClusters(std::vector <Cluster>& clusters, const Eigen::Matrix<double, 
           biggerC.tryMergeCluster(smallerC, mergReq.distMerging, mergReq.angleFracMerging, mergReq.reqPoints, mergReq.requireCloseness);
           if (smallerC.mergedCluster) {
             biggerC.recalculatePLANE(points);
+
+//          if (videoCounterCluster++ > 30) {
+//            printPointsWRTClusters("./video_A_video_step2_" + formatInteger(video_mergingCounter++, 12)  + ".ply", points, clusters, colors);
+//            videoCounterCluster = 0;
+//          }
           }
-//              if (smallerC.mergedCluster) {
-//                if (videoCounterCluster++ > 30) {
-//                  printPointsWRTClusters("./video_A_video_step2_" + formatInteger(video_mergingCounter++, 12)  + ".ply", points, clusters, colors);
-//                  videoCounterCluster = 0;
-//                }
-//              }
         }
       }
       stillmerging = false;

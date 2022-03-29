@@ -429,7 +429,7 @@ public:
     return false;
   }
 
-  // Note:
+  // Note: Angle between them is smaller than 90 degree.
   bool vectorsHaveSameDirection(Eigen::Vector3d v1, Eigen::Vector3d v2) {
     return v1.dot(v2) > 0;
   }
@@ -474,9 +474,5 @@ public:
     std::cout << "\n";
   }
 };
-
-
-
-
 
 }

@@ -16,17 +16,7 @@
 
 namespace RoomCReconstruction {
 
-
-/*struct DebugCombis {
-  int i1;
-  int i2;
-  int i3;
-};*/
-
-
-
 std::vector<TriangleNode3D> generateTriangles(std::vector<Cluster> clusters, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points);
 bool checkSomewhatOrthogonal(Cluster c1, Cluster c2);
-
 
 }

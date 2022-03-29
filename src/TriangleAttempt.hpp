@@ -36,9 +36,6 @@ public:
   Eigen::Vector3d edgeLine2;
   Eigen::Vector3d edgeLine3;
 
-  /*std::vector<DebugCombis> dbgOld;
-  std::vector<DebugCombis> dbgNew;*/
-
 
   std::vector<Eigen::Vector2d> flatpointsC1;
   std::vector<Eigen::Vector2d> flatpointsC2;
@@ -485,38 +482,6 @@ public:
               << "," << max_npA[4] << "," << max_npA[5] << "\n";
 
   }
-  /*void printCombiDiff() {
-    if (dbgOld.size() != dbgNew.size()) {std::cout << "old-size: " << dbgOld.size() << ", new-size: " << dbgNew.size() << "\n";}
-    for (DebugCombis dbC : dbgOld) {
-      int found = 0;
-      for (DebugCombis dbC2 : dbgNew) {
-        if (dbC.i1 == dbC2.i1 && dbC.i2 == dbC2.i2 && dbC.i3 == dbC2.i3) {
-          found++;
-        }
-      }
-      if (found == 0) {
-        std::cout << "Did not find in new: " << dbC.i1 << "," << dbC.i2 << "," << dbC.i3 << "\n";
-      } else if (found > 1) {
-        std::cout << "Found multiple times in new: " << dbC.i1 << "," << dbC.i2 << "," << dbC.i3 << "\n";
-      }
-    }
-
-
-    for (DebugCombis dbC : dbgNew) {
-      int found = 0;
-      for (DebugCombis dbC2 : dbgOld) {
-        if (dbC.i1 == dbC2.i1 && dbC.i2 == dbC2.i2 && dbC.i3 == dbC2.i3) {
-          found++;
-        }
-      }
-      if (found == 0) {
-        std::cout << "Did not find in old: " << dbC.i1 << "," << dbC.i2 << "," << dbC.i3 << "\n";
-      } else if (found > 1) {
-        std::cout << "Found multiple times in old: " << dbC.i1 << "," << dbC.i2 << "," << dbC.i3 << "\n";
-      }
-    }
-
-  }*/
 };
 
 
