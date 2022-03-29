@@ -14,10 +14,8 @@ namespace RoomCReconstruction {
   struct face_indices { std::uint32_t i0, i1, i2; };
   struct edge_indices { std::uint32_t i0, i1; };
 
-  void writePoints(const std::string& filename, const std::vector <Eigen::Vector3d> points);
-  void writePointsWColors(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::array<unsigned char, 3>>& colors);
-  void writeEdgesWColors(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::array<unsigned char, 3>>& colors);
-  void writeEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points);
+  void write3DPoints(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::array<unsigned char, 3>>& colors);
+  void write3DEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::array<unsigned char, 3>>& colors);
   void writePointsWithFaces(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::uint32_t> faceIndices);
   void standardWrite(const std::string& filename, tinyply::PlyFile& file);
   void fileAddVertices(tinyply::PlyFile& file, std::vector<vertex>& vertices);

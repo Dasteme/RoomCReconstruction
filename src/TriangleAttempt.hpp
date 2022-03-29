@@ -159,9 +159,9 @@ public:
       printFlatQuadrants("output_DEBUG_FlatQ2_shifted.ply", flatQuadrats[1], arrowPiecesSize, -max_npA[getNegArrInd(true, 1)], -max_npA[getNegArrInd(false, 1)]);
       printFlatQuadrants("output_DEBUG_FlatQ3_shifted.ply", flatQuadrats[2], arrowPiecesSize, -max_npA[getNegArrInd(true, 2)], -max_npA[getNegArrInd(false, 2)]);
 
-      writePoints("A_DEBUG_PointsQ1.ply", simple2Dto3D(flatpointsC1));
-      writePoints("A_DEBUG_PointsQ2.ply", simple2Dto3D(flatpointsC2));
-      writePoints("A_DEBUG_PointsQ3.ply", simple2Dto3D(flatpointsC3));
+      write3DPoints("A_DEBUG_PointsQ1.ply", simple2Dto3D(flatpointsC1), {});
+      write3DPoints("A_DEBUG_PointsQ2.ply", simple2Dto3D(flatpointsC2), {});
+      write3DPoints("A_DEBUG_PointsQ3.ply", simple2Dto3D(flatpointsC3), {});
     }
 
 

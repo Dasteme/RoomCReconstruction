@@ -179,7 +179,7 @@ public:
       arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
       arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(2)});
     }
-    writeEdgesWColors("video_A_video_step3_" + formatInteger(vid_counter++, 12) + ".ply", arrows, arrowColors);
+    write3DEdges("video_A_video_step3_" + formatInteger(vid_counter++, 12) + ".ply", arrows, arrowColors);
 */
 
 

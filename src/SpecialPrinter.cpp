@@ -33,7 +33,7 @@ void printArrows(const std::string& filename, double len, bool needLinks, std::v
     arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
     arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(2)});
   }
-  writeEdgesWColors(filename, arrows, arrowColors);
+  write3DEdges(filename, arrows, arrowColors);
 };
 
 
@@ -93,7 +93,7 @@ void printMarkerpoints(const std::string& filename, std::vector <Cluster>& clust
   for (int mark_i = 0; mark_i < clusters.size(); mark_i++) {
     verticesMarker.insert(verticesMarker.end(), clusters[mark_i].markerPoints.begin(), clusters[mark_i].markerPoints.end());
   }
-  writePoints(filename, verticesMarker);
+  write3DPoints(filename, verticesMarker, {});
 }
 
 
