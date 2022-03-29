@@ -21,6 +21,9 @@ set(HEADER_FILES
         src/rcr_io.hpp
         src/Helper.hpp
         src/SpecialPrinter.hpp
+        src/Cluster.hpp
+        src/TriangleAttempt.hpp
+        src/TriangleNode3D.hpp
         )
 
 set(SOURCE_FILES
