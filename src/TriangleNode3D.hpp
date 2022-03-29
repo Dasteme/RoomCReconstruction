@@ -245,7 +245,7 @@ public:
       Eigen::Vector3d followingArrow;
       int myArrowIdx, followingArrayIdx;
       if (hasTwoSimilarClusters(t, myArrowIdx, followingArrayIdx)) {
-        if (this->arrows[myArrowIdx] != t.arrows[followingArrayIdx] && this->arrows[myArrowIdx] != -t.arrows[followingArrayIdx]) { // Todo: make an assertion
+        if (this->arrows[myArrowIdx] != t.arrows[followingArrayIdx] && this->arrows[myArrowIdx] != -t.arrows[followingArrayIdx]) {
           std::cout << "ERROR: Two triangles which intersect two same planes don't have the same arrow-direction.\n";
           exit(0);
         } else {
@@ -282,8 +282,6 @@ public:
       //if (e1.dist > arrowLimits[e1.myArrow] && e2.dist <= arrowLimits[e2.myArrow]) return false; // if e1 is out of limit and e2 is not, prefer e2
       //if (e1.dist <= arrowLimits[e1.myArrow] && e2.dist > arrowLimits[e2.myArrow]) return false; // other way around
 
-      // If the difference is very small, we prefer a longer arrow (otherwise, what are we doing to do with the second arrow?)
-      // TODO: Maybe the second one is the wrong arrow. Compare scores of arrow to determine which is better.
       if (std::abs(e1.dist - e2.dist) < 0.8) {
         //return e1.dist > e2.dist;
         return allTriangles[e1.opposingTriangle].score > allTriangles[e2.opposingTriangle].score;

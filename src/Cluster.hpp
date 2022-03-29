@@ -194,9 +194,13 @@ public:
 
       if (possibleMergePoints / toMergeCluster.points.size() >= reqPercent) {
         for (int i = 0; i < toMergeCluster.points.size(); i++) {
-          if (checkAdd(
+
+          Add(toMergeCluster.pointsReal[i],
+              toMergeCluster.pointsNormals[i],
+              toMergeCluster.points[i]);
+
+          /*if (checkAdd(
             toMergeCluster.center, toMergeCluster.normal, dist, angle_frac, unnec_dist_p)) {
-            // Todo: Consider adding without normal
             Add(toMergeCluster.pointsReal[i],
                 toMergeCluster.pointsNormals[i],
                 toMergeCluster.points[i]);
@@ -205,11 +209,12 @@ public:
                               dist,
                               angle_frac,
                               unnec_dist_p)) {
-            // Todo: Consider adding without normal
             Add(toMergeCluster.pointsReal[i],
                 -toMergeCluster.pointsNormals[i],
                 toMergeCluster.points[i]);
-          }
+          } else {
+           // Consider adding without normal
+          }*/
         }
         markerPoints.insert(markerPoints.end(),
                             toMergeCluster.markerPoints.begin(),
