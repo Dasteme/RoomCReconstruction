@@ -35,7 +35,7 @@ std::vector <Cluster> generateClusters(const TangentSpace::SearchTree &search_tr
 
       queuePopped++;
 
-      int i = pointQueue.front();
+      size_t i = pointQueue.front();
       pointQueue.pop();
 
 
@@ -60,8 +60,6 @@ std::vector <Cluster> generateClusters(const TangentSpace::SearchTree &search_tr
       std::vector<double> dists_sqrd(21);
       nanoflann::KNNResultSet<double> result_set{ 21 };
       result_set.init(ret_indexes.data(), dists_sqrd.data());
-
-      const Eigen::Matrix<double, 3, Eigen::Dynamic>& points{ search_tree.m_data_matrix.get() };
 
       const double* query_point_data{ points.col(static_cast<Eigen::Index>(i)).data() };
 
@@ -99,7 +97,7 @@ std::vector <Cluster> generateClusters(const TangentSpace::SearchTree &search_tr
         Cluster newCluster;
         newCluster.normal = local_pcas[i].local_base.col(2);
         newCluster.center = points.col(static_cast<Eigen::Index>(i));
-        newCluster.markerPoints.push_back(points.col(static_cast<Eigen::Index>(i)));
+        newCluster.markerPoints.emplace_back(points.col(static_cast<Eigen::Index>(i)));
         if (!newCluster.checkAndAdd(points.col(static_cast<Eigen::Index>(i)),
                                     local_pcas[i].local_base.col(2),
                                     0.05,
@@ -115,11 +113,11 @@ std::vector <Cluster> generateClusters(const TangentSpace::SearchTree &search_tr
       }
 
       // Prepare next queue-members
-      for (int neighbor_i = 0; neighbor_i < ret_indexes.size(); neighbor_i++) {
-        if (!addedPoints[ret_indexes[neighbor_i]]) {
-          pointQueue.push(ret_indexes[neighbor_i]);
-          addedPoints[ret_indexes[neighbor_i]] = true;
-          if (clusterSuggestions[ret_indexes[neighbor_i]] == -1) {clusterSuggestions[ret_indexes[neighbor_i]] = found;}
+      for (unsigned int & ret_indexe : ret_indexes) {
+        if (!addedPoints[ret_indexe]) {
+          pointQueue.push(ret_indexe);
+          addedPoints[ret_indexe] = true;
+          if (clusterSuggestions[ret_indexe] == -1) {clusterSuggestions[ret_indexe] = found;}
         }
       }
     }
@@ -130,7 +128,7 @@ std::vector <Cluster> generateClusters(const TangentSpace::SearchTree &search_tr
 
 
 void sortClusters(std::vector <Cluster>& clusters) {
-  const auto compareCluster{[](Cluster c1, Cluster c2) -> bool {
+  const auto compareCluster{[](const Cluster& c1, const Cluster& c2) -> bool {
     return c1.points.size() > c2.points.size();
   }};
   std::sort(clusters.begin(), clusters.end(), compareCluster);
@@ -147,8 +145,8 @@ void mergeClusters(std::vector <Cluster>& clusters, const Eigen::Matrix<double, 
                                           {max_possible_rec_angle/2, 0.1, 0, -1}   // Merges distant clusters belonging to the same wall.
   };                                         // Need to be quite exact, otherwise we are possibly going to merge wall+furniture, slightly change the walls normal and then arrow-finding is less exact and may even get wrong arrows
 
-  for (int i = 0; i < clusters.size(); i++) {
-    clusters[i].recalculatePLANE(points);
+  for (auto & cluster : clusters) {
+    cluster.recalculatePLANE(points);
   }
 
   bool stillmerging;

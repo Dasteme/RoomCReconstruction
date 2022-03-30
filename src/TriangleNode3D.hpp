@@ -1,3 +1,5 @@
+#include <utility>
+
 //
 // Created by Dave on 29.03.2022.
 //
@@ -66,7 +68,7 @@ public:
                  std::array<Eigen::Vector3d, 3> arrows_p,
                  std::array<double, 3> suggestedLengths_p,
                  bool inwardsTriangle_p,
-                 double score_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(corner_p),arrows(arrows_p),suggestedLengths(suggestedLengths_p),inwardsTriangle(inwardsTriangle_p),score(score_p)
+                 double score_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(std::move(corner_p)),arrows(std::move(arrows_p)),suggestedLengths(suggestedLengths_p),inwardsTriangle(inwardsTriangle_p),score(score_p)
   {
     possibilites = {std::vector<ExtStr2>(), std::vector<ExtStr2>(), std::vector<ExtStr2>()};
     chosen = {-1, -1, -1};
@@ -140,7 +142,7 @@ public:
     return true;
   }
 
-  void rollbackMods(std::vector<TriangleNode3D>& allTriangles, RecursionModifiactions mods) {
+  static void rollbackMods(std::vector<TriangleNode3D>& allTriangles, const RecursionModifiactions& mods) {
     for (ModifiactionElement me : mods.mods) {
       allTriangles[me.trianlgeIdx].chosen[me.chosenIdx] = -1;
     }
@@ -234,7 +236,7 @@ public:
         }
       }
     }
-    throw "setChosen Exception";
+    throw std::exception("setChosen Exception");
   }
 
   void findPossibleFollowers(const std::vector<TriangleNode3D>& allTriangles, int myIdx) {
@@ -278,7 +280,7 @@ public:
   void sortPossibilities(const std::vector<TriangleNode3D>& allTriangles) {
 
     // Returns true if e1 is better than e2
-    const auto comparePoss{[this, allTriangles](ExtStr2 e1, ExtStr2 e2) -> bool {
+    const auto comparePoss{[allTriangles](ExtStr2 e1, ExtStr2 e2) -> bool {
       //if (e1.dist > arrowLimits[e1.myArrow] && e2.dist <= arrowLimits[e2.myArrow]) return false; // if e1 is out of limit and e2 is not, prefer e2
       //if (e1.dist <= arrowLimits[e1.myArrow] && e2.dist > arrowLimits[e2.myArrow]) return false; // other way around
 
@@ -297,7 +299,7 @@ public:
     }
   }
 
-  bool hasTwoSimilarClusters(TriangleNode3D t, int& myArrowI, int& follorwingArrowI) {
+  bool hasTwoSimilarClusters(const TriangleNode3D& t, int& myArrowI, int& follorwingArrowI) {
     if (isEqual(t)) return false;
 
     // Notes: We can skip some if's because the indices C1 to C3 are ordered in ascending order.
@@ -343,9 +345,9 @@ public:
   }
 
   bool isInvalid() {
-    return possibilites[0].size() == 0 || possibilites[1].size() == 0 || possibilites[2].size() == 0;
+    return possibilites[0].empty() || possibilites[1].empty() || possibilites[2].empty();
   }
-  bool isEqual(TriangleNode3D t) {
+  bool isEqual(const TriangleNode3D& t) {
     return t.idxC1 == this->idxC1 && t.idxC2 == this->idxC2 && t.idxC3 == this->idxC3;
   }
 
@@ -398,7 +400,6 @@ public:
     }
     std::cout << "findNextExtStr2Plane Exception";
     exit(0);
-    throw "findNextExtStr2Plane Exception";
   }
 
   void iterateOverClusterContour(std::vector<TriangleNode3D>& allTriangles, ExtStr2 link, int startIndex, int clusterIndex, ClusterPolygon& cp, std::queue<int>& possibleFollowups, std::vector<int>& dones) {
@@ -417,7 +418,7 @@ public:
   }
 
   bool clusterPolygonsContainCluster(std::vector<ClusterPolygon>& polygons, int clusterIndex) {
-    for (ClusterPolygon cp : polygons) {
+    for (const ClusterPolygon& cp : polygons) {
       if (cp.idxCluster == clusterIndex) {
         for (int i : cp.triangles) {
           if (i == myIndex) return true;
@@ -425,11 +426,6 @@ public:
       }
     }
     return false;
-  }
-
-  // Note: Angle between them is smaller than 90 degree.
-  bool vectorsHaveSameDirection(Eigen::Vector3d v1, Eigen::Vector3d v2) {
-    return v1.dot(v2) > 0;
   }
 
   void print(std::vector<TriangleNode3D>& allTriangles) {
@@ -451,20 +447,20 @@ public:
 
     std::cout << "}\n";
   }
-  void printExtStr2(ExtStr2 es) {
+  static void printExtStr2(ExtStr2 es) {
     std::cout << es.myTriangle << "<->" << es.opposingTriangle << "|" << es.dist;
   }
-  void printVector3D(Eigen::Vector3d vec) {
+  static void printVector3D(Eigen::Vector3d vec) {
     std::cout << std::to_string(vec[0]) << ","
               << std::to_string(vec[1]) << ","
               << std::to_string(vec[2]);
   }
-  void printDepthIndent(int depth) {
+  static void printDepthIndent(int depth) {
     for (int i = 0; i < depth; i++) {
       std::cout << "  ";
     }
   }
-  void printClusterPolygon(ClusterPolygon cp) {
+  static void printClusterPolygon(const ClusterPolygon& cp) {
     std::cout << "CLPOLY: " << cp.idxCluster;
     for (int i : cp.triangles) {
       std::cout << i << ",";

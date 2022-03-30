@@ -17,12 +17,12 @@ void printArrows(const std::string& filename, double len, bool needLinks, std::v
     if (needLinks) {
       if (t.isInvalid()) continue;
     }
-    arrows.push_back(t.corner);
-    arrows.push_back(t.corner+ ((len == 0) ? t.suggestedLengths[0]:len)  *t.arrows[0]);
-    arrows.push_back(t.corner);
-    arrows.push_back(t.corner+ ((len == 0) ? t.suggestedLengths[1]:len)  *t.arrows[1]);
-    arrows.push_back(t.corner);
-    arrows.push_back(t.corner+ ((len == 0) ? t.suggestedLengths[2]:len)  *t.arrows[2]);
+    arrows.emplace_back(t.corner);
+    arrows.emplace_back(t.corner+ ((len == 0) ? t.suggestedLengths[0]:len)  *t.arrows[0]);
+    arrows.emplace_back(t.corner);
+    arrows.emplace_back(t.corner+ ((len == 0) ? t.suggestedLengths[1]:len)  *t.arrows[1]);
+    arrows.emplace_back(t.corner);
+    arrows.emplace_back(t.corner+ ((len == 0) ? t.suggestedLengths[2]:len)  *t.arrows[2]);
 
     // Colors: Center is red if inwards, blue if outwards. Last index is triangle index.
     //         Arrow-endpoints contain arrow-index at last position
@@ -34,7 +34,7 @@ void printArrows(const std::string& filename, double len, bool needLinks, std::v
     arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(2)});
   }
   write3DEdges(filename, arrows, arrowColors);
-};
+}
 
 
 
@@ -43,10 +43,10 @@ void printPointsWRTClusters(const std::string& filename,
                             const std::vector <Cluster>& clusters) {
 
   std::vector <std::array<unsigned char, 3>> colors(points.size() / 3, std::array < unsigned char, 3 > {0});
-  for (int i = 0; i < clusters.size(); i++) {
-    if (clusters[i].mergedCluster) continue;
-    for (int j = 0; j < clusters[i].points.size(); j++) {
-      colors[clusters[i].points[j]] = clusters[i].color;
+  for (const auto & cluster : clusters) {
+    if (cluster.mergedCluster) continue;
+    for (int j = 0; j < cluster.points.size(); j++) {
+      colors[cluster.points[j]] = cluster.color;
     }
   }
   TangentSpace::IO::write3DPointsWithColors(filename, points, colors);
@@ -54,11 +54,11 @@ void printPointsWRTClusters(const std::string& filename,
 
 
 
-void printLinkedRoom(const std::string& filename, LinkedRoom linkedRoom, std::vector <Cluster>& clusters, std::vector<TriangleNode3D>& intersection_triangles) {
+void printLinkedRoom(const std::string& filename, const LinkedRoom& linkedRoom, std::vector <Cluster>& clusters, std::vector<TriangleNode3D>& intersection_triangles) {
 
   std::vector<Eigen::Vector3d> vertices_room;
   std::vector<std::uint32_t> faces_room;
-  for (ClusterPolygon cp : linkedRoom) {
+  for (const ClusterPolygon& cp : linkedRoom) {
     std::cout << "Cidx: " << cp.idxCluster << "\n";
     std::vector<Eigen::Vector3d> c_pnts;
     for (int tri : cp.triangles) {
@@ -90,8 +90,8 @@ void printLinkedRoom(const std::string& filename, LinkedRoom linkedRoom, std::ve
 
 void printMarkerpoints(const std::string& filename, std::vector <Cluster>& clusters) {
   std::vector<Eigen::Vector3d> verticesMarker;
-  for (int mark_i = 0; mark_i < clusters.size(); mark_i++) {
-    verticesMarker.insert(verticesMarker.end(), clusters[mark_i].markerPoints.begin(), clusters[mark_i].markerPoints.end());
+  for (auto & cluster : clusters) {
+    verticesMarker.insert(verticesMarker.end(), cluster.markerPoints.begin(), cluster.markerPoints.end());
   }
   write3DPoints(filename, verticesMarker, {});
 }

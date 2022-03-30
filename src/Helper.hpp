@@ -23,7 +23,9 @@ namespace RoomCReconstruction {
   double safe_acos(double value);
   double gaussian_1d(const double x, const double A, const double x0, const double sigma_x);
   double gaussian_2d(const double x, const double y, const double A, const double x0, const double y0, const double sigma_x, const double sigma_y);
-  double calcDistance(Eigen::Vector3d vec1, Eigen::Vector3d vec2);
+  double calcDistance(const Eigen::Vector3d& vec1, const Eigen::Vector3d& vec2);
+  double calcAngle(const Eigen::Vector3d &vec1, const Eigen::Vector3d& vec2);
+  bool vectorsHaveSameDirection(const Eigen::Vector3d& v1, const Eigen::Vector3d& v2);
   Eigen::Vector3d calcPerpendicular(const Eigen::Vector3d& vec);
   void printMyVec(const Eigen::Vector3d& vec);
   void printMyVec2d(const Eigen::Vector2d& vec);
@@ -34,12 +36,12 @@ namespace RoomCReconstruction {
   double computePolygonArea(const std::vector<Eigen::Vector2d>& vertices);
   double cross2d(Eigen::Vector2d a, Eigen::Vector2d b);
 
-  void Barycentric(Eigen::Vector2d a, Eigen::Vector2d b, Eigen::Vector2d c, Eigen::Vector2d p, double &u, double &v, double &w);
+  void Barycentric(const Eigen::Vector2d& a, const Eigen::Vector2d& b, const Eigen::Vector2d& c, const Eigen::Vector2d& p, double &u, double &v, double &w);
 
   double randomBetween(double minInclusive, double maxInclusive);
   bool trueWithProbability(double probability);
 
-std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d center, Eigen::Vector3d normal, const std::vector<Eigen::Vector3d>& pnts, Eigen::Vector3d a1, Eigen::Vector3d a2);
+std::vector<Eigen::Vector2d> transformPlanePointsTo2D(const Eigen::Vector3d &center, const Eigen::Vector3d& normal, const std::vector<Eigen::Vector3d>& pnts, const Eigen::Vector3d &a1, const Eigen::Vector3d& a2);
 bool insideBB(BoundingBox& bb, Eigen::Vector3d& p);
 
 

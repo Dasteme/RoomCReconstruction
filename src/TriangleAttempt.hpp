@@ -131,7 +131,7 @@ public:
 
     // Fill up triangles
     for (int clIdx = 0; clIdx < 3; clIdx++) {
-      if (flatQuadrats[clIdx].size() == 0) continue;
+      if (flatQuadrats[clIdx].empty()) continue;
 
       std::vector<Eigen::Vector2d>& fP = (clIdx ==0) ? flatpointsC1:((clIdx ==1) ? flatpointsC2:flatpointsC3);
       double max_neg_1 = max_npA[getNegArrInd(true, clIdx)];
@@ -151,13 +151,13 @@ public:
     }
 
     if (debugIt) {
-      printFlatQuadrants("output_DEBUG_FlatQ1_notShifted.ply", flatQuadrats[0], arrowPiecesSize, 0, 0);
-      printFlatQuadrants("output_DEBUG_FlatQ2_notShifted.ply", flatQuadrats[1], arrowPiecesSize, 0, 0);
-      printFlatQuadrants("output_DEBUG_FlatQ3_notShifted.ply", flatQuadrats[2], arrowPiecesSize, 0, 0);
+      printFlatQuadrants("output_DEBUG_FlatQ1_notShifted.ply", flatQuadrats[0], 0, 0);
+      printFlatQuadrants("output_DEBUG_FlatQ2_notShifted.ply", flatQuadrats[1], 0, 0);
+      printFlatQuadrants("output_DEBUG_FlatQ3_notShifted.ply", flatQuadrats[2], 0, 0);
 
-      printFlatQuadrants("output_DEBUG_FlatQ1_shifted.ply", flatQuadrats[0], arrowPiecesSize, -max_npA[getNegArrInd(true, 0)], -max_npA[getNegArrInd(false, 0)]);
-      printFlatQuadrants("output_DEBUG_FlatQ2_shifted.ply", flatQuadrats[1], arrowPiecesSize, -max_npA[getNegArrInd(true, 1)], -max_npA[getNegArrInd(false, 1)]);
-      printFlatQuadrants("output_DEBUG_FlatQ3_shifted.ply", flatQuadrats[2], arrowPiecesSize, -max_npA[getNegArrInd(true, 2)], -max_npA[getNegArrInd(false, 2)]);
+      printFlatQuadrants("output_DEBUG_FlatQ1_shifted.ply", flatQuadrats[0], -max_npA[getNegArrInd(true, 0)], -max_npA[getNegArrInd(false, 0)]);
+      printFlatQuadrants("output_DEBUG_FlatQ2_shifted.ply", flatQuadrats[1], -max_npA[getNegArrInd(true, 1)], -max_npA[getNegArrInd(false, 1)]);
+      printFlatQuadrants("output_DEBUG_FlatQ3_shifted.ply", flatQuadrats[2], -max_npA[getNegArrInd(true, 2)], -max_npA[getNegArrInd(false, 2)]);
 
       write3DPoints("A_DEBUG_PointsQ1.ply", simple2Dto3D(flatpointsC1), {});
       write3DPoints("A_DEBUG_PointsQ2.ply", simple2Dto3D(flatpointsC2), {});
@@ -169,7 +169,7 @@ public:
 
     // Iterate over "all" possible arrow-combinations and adapt best-score and arrows
     //distIterationOLD(max_npA);
-    distIteration(max_npA);
+    distIteration();
 
     if (best_a1 < 0) edgeLine1 = -edgeLine1;
     if (best_a2 < 0) edgeLine2 = -edgeLine2;
@@ -181,11 +181,11 @@ public:
     return best_score > 0;
   }
 
-  int applyDiscrete(double len) {
+  static int applyDiscrete(double len) {
     return std::ceil(len / arrowPiecesSize);
   };
 
-  int specialArrowDecInc(int arrow_i) {
+  static int specialArrowDecInc(int arrow_i) {
     //return arrow_i+1;
 
     if (arrow_i < 0 && arrow_i >= -6) return arrow_i+1;
@@ -200,7 +200,7 @@ public:
 
     return arrow_i + 16;
   };
-  void distIterationOLD(std::array<int, 6>& max_npA) {
+  void distIterationOLD() {
     for (int a1_i = -max_npA[1]; a1_i <= max_npA[0]; a1_i = specialArrowDecInc(a1_i)) {
       if (a1_i == 0) continue;
 
@@ -217,7 +217,7 @@ public:
     }
   }
 
-  void distIteration(std::array<int, 6>& max_npA) {
+  void distIteration() {
     for (int dist = 0; dist <= getMax_maxNPA(max_npA); dist = specialArrowDecInc(dist)) {
       // Calculate all possible rectangles with this distance.
       // This means, at least one arrow must have this distance
@@ -247,7 +247,7 @@ public:
     }
   }
 
-  void surfaceIterator(int dist1, int dist2, int dir1_min, int dir1_max, int dir2_min, int dir2_max, std::function<void(int, int)> cb) {
+  static void surfaceIterator(int dist1, int dist2, int dir1_min, int dir1_max, int dir2_min, int dir2_max, const std::function<void(int, int)>& cb) {
     for (int a2_it = -std::min(dist1, dir1_min); a2_it <= std::min(dist1, dir1_max); a2_it = specialArrowDecInc(a2_it)) {
       if (a2_it == 0) continue;
       for (int a3_it = -std::min(dist2, dir2_min); a3_it <= std::min(dist2, dir2_max); a3_it = specialArrowDecInc(a3_it)) {
@@ -337,7 +337,7 @@ public:
 
 
 
-  int getMax_maxNPA(std::array<int, 6> max_npA) {
+  static int getMax_maxNPA(std::array<int, 6> max_npA) {
     return std::max(std::max(std::max(max_npA[0], max_npA[1]), std::max(max_npA[2], max_npA[3])), std::max(max_npA[4], max_npA[5]));
   };
 
@@ -396,7 +396,7 @@ public:
   };
 
 
-  int getNegArrInd(bool x_axis, int clIdx) {
+  static int getNegArrInd(bool x_axis, int clIdx) {
     if (x_axis) {
       return (clIdx==0) ? 1:((clIdx==1) ? 1:3);
     } else {
@@ -407,7 +407,7 @@ public:
 
 
   // Returns true if worked
-  bool
+  static bool
   intersect3Clusters(Cluster c1, Cluster c2, Cluster c3, Eigen::Vector3d& resultPoint) {
     Eigen::Vector3d u = c2.normal.cross(c3.normal);
     double denom = c1.normal.dot(u);
@@ -423,13 +423,13 @@ public:
 /*
  * Intersects 2 Clusters and returns only the direction of the intersection.
  */
-  bool intersect2Clusters(Cluster c1, Cluster c2, Eigen::Vector3d& direction) {
+  static bool intersect2Clusters(const Cluster& c1, const Cluster& c2, Eigen::Vector3d& direction) {
     direction = c1.normal.cross(c2.normal);
-    return !(direction.dot(direction) < DBL_EPSILON);
+    return direction.dot(direction) >= DBL_EPSILON;
   }
 
 
-  std::array<double, 4> calcBoundaries(const std::vector<Eigen::Vector2d>& fP) {
+  static std::array<double, 4> calcBoundaries(const std::vector<Eigen::Vector2d>& fP) {
     double minX = 0; // Note that we all set to 0 instead of "max double".
     double maxX = 0;
     double minY = 0;
@@ -448,7 +448,7 @@ public:
   }
 
 
-  void printFlatQuadrants(const std::string& filename, std::vector<std::vector<bool>> flatQuadrat, double arrowPiecesSize, int shift_x, int shift_y) {
+  static void printFlatQuadrants(const std::string& filename, std::vector<std::vector<bool>> flatQuadrat, int shift_x, int shift_y) {
     std::vector<Eigen::Vector3d> vertices;
     std::vector<std::uint32_t> faces;
 
@@ -457,10 +457,10 @@ public:
     for (int i = 0; i < flatQuadrat.size(); i++) {
       for (int j = 0; j < flatQuadrat[i].size(); j++) {
         if (!flatQuadrat[i][j]) continue;
-        vertices.push_back({(shift_x +i)*arrowPiecesSize, (shift_y +j)*arrowPiecesSize, 0});
-        vertices.push_back({(shift_x +i)*arrowPiecesSize+arrowPiecesSize, (shift_y +j)*arrowPiecesSize, 0});
-        vertices.push_back({(shift_x +i)*arrowPiecesSize+arrowPiecesSize, (shift_y +j)*arrowPiecesSize+arrowPiecesSize, 0});
-        vertices.push_back({(shift_x +i)*arrowPiecesSize, (shift_y +j)*arrowPiecesSize+arrowPiecesSize, 0});
+        vertices.emplace_back((shift_x +i)*arrowPiecesSize, (shift_y +j)*arrowPiecesSize, 0);
+        vertices.emplace_back((shift_x +i)*arrowPiecesSize+arrowPiecesSize, (shift_y +j)*arrowPiecesSize, 0);
+        vertices.emplace_back((shift_x +i)*arrowPiecesSize+arrowPiecesSize, (shift_y +j)*arrowPiecesSize+arrowPiecesSize, 0);
+        vertices.emplace_back((shift_x +i)*arrowPiecesSize, (shift_y +j)*arrowPiecesSize+arrowPiecesSize, 0);
 
         faces.push_back(tracker + 0);
         faces.push_back(tracker + 1);

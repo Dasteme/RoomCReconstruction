@@ -29,9 +29,9 @@ public:
 
   Cluster()
   {
-    color[0] = rand() % 256;
-    color[1] = rand() % 256;
-    color[2] = rand() % 256;
+    color = {static_cast<unsigned char>(rand() % 256),
+             static_cast<unsigned char>(rand() % 256),
+             static_cast<unsigned char>(rand() % 256)};
   }
 
   double distanceToClusterFromMarker(const Eigen::Vector3d& point)
@@ -55,14 +55,14 @@ public:
     }
     return minDist;
   }
-  bool checkDistCloseEnough(Eigen::Vector3d& point, double& dist_param)
+  bool checkDistCloseEnough(const Eigen::Vector3d& point, double& dist_param)
   {
     dist_param = distanceToClusterFromMarker(point);
     return dist_param <= 0.5;
   }
 
-  bool checkAdd(Eigen::Vector3d point,
-                Eigen::Vector3d pointNormal,
+  bool checkAdd(const Eigen::Vector3d& point,
+                const Eigen::Vector3d& pointNormal,
                 double dist,
                 double angle_frac,
                 double& dist_param)
@@ -76,7 +76,7 @@ public:
             (dist_param == -1 || checkDistCloseEnough(point, dist_param)));
   }
 
-  void Add(Eigen::Vector3d point, Eigen::Vector3d pointNormal, size_t pointIndex)
+  void Add(const Eigen::Vector3d& point, const Eigen::Vector3d& pointNormal, size_t pointIndex)
   {
     points.push_back(pointIndex);
     pointsReal.push_back(point);
@@ -85,8 +85,8 @@ public:
     updateNormal(pointNormal);
   }
 
-  bool checkAndAdd(Eigen::Vector3d point,
-                   Eigen::Vector3d pointNormal,
+  bool checkAndAdd(const Eigen::Vector3d& point,
+                   const Eigen::Vector3d& pointNormal,
                    double dist,
                    double angle_frac,
                    size_t pointIndex,
@@ -110,12 +110,12 @@ public:
     return false;
   }
 
-  void updateCenter(Eigen::Vector3d newPoint)
+  void updateCenter(const Eigen::Vector3d& newPoint)
   {
     center = (center * (points.size() - 1) + newPoint) / points.size();
   }
 
-  void updateNormal(Eigen::Vector3d newNormal)
+  void updateNormal(const Eigen::Vector3d& newNormal)
   {
     normal = (normal * (points.size() - 1) + newNormal) / points.size();
 
@@ -124,18 +124,11 @@ public:
 
   double getPlaneD() { return normal.dot(center); }
 
-  /**
-   * Calculates angle between vec1 and vec2
-   */
-  double calcAngle(Eigen::Vector3d vec1, Eigen::Vector3d vec2)
-  {
-    return acos(vec1.dot(vec2) / (vec1.norm() * vec2.norm()));
-  }
 
   /**
    *  Calculates absolute Distance from vec1 to center. Order doesn't matter
    */
-  double calcDistanceToCenter(Eigen::Vector3d vec1) { return calcDistance(vec1, center); }
+  double calcDistanceToCenter(const Eigen::Vector3d& vec1) { return calcDistance(vec1, center); }
 
 
   void tryMergeCluster(Cluster& toMergeCluster,
@@ -227,8 +220,8 @@ public:
   void addSupportiveRoomCube(int x, int y, int z)
   {
     // Check if we already have this supportive cube
-    for (int i = 0; i < supportiveCubes.size(); i++) {
-      if (supportiveCubes[i][0] == x && supportiveCubes[i][1] == y && supportiveCubes[i][2] == 2) {
+    for (auto & supportiveCube : supportiveCubes) {
+      if (supportiveCube[0] == x && supportiveCube[1] == y && supportiveCube[2] == 2) {
         return;
       }
     }

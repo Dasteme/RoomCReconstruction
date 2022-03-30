@@ -15,7 +15,7 @@ void printArrows(const std::string& filename, double len, bool needLinks, std::v
 void printPointsWRTClusters(const std::string& filename,
                             const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
                             const std::vector <Cluster>& clusters);
-void printLinkedRoom(const std::string& filename, LinkedRoom linkedRoom, std::vector <Cluster>& clusters, std::vector<TriangleNode3D>& intersection_triangles);
+void printLinkedRoom(const std::string& filename, const LinkedRoom& linkedRoom, std::vector <Cluster>& clusters, std::vector<TriangleNode3D>& intersection_triangles);
 
 void printMarkerpoints(const std::string& filename, std::vector <Cluster>& clusters);
 

@@ -15,8 +15,8 @@ namespace RoomCReconstruction {
   struct edge_indices { std::uint32_t i0, i1; };
 
   void write3DPoints(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::array<unsigned char, 3>>& colors);
-  void write3DEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::array<unsigned char, 3>>& colors);
-  void writePointsWithFaces(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::uint32_t> faceIndices);
+  void write3DEdges(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::array<unsigned char, 3>>& colors);
+  void writePointsWithFaces(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::uint32_t>& faceIndices);
   void standardWrite(const std::string& filename, tinyply::PlyFile& file);
   void fileAddVertices(tinyply::PlyFile& file, std::vector<vertex>& vertices);
   void fileAddEdges(tinyply::PlyFile& file, std::vector<edge_indices>& edges);

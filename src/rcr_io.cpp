@@ -18,8 +18,8 @@ namespace RoomCReconstruction {
 
     std::vector<vertex> vertices;
 
-    for (int i = 0; i < points.size(); i++) {
-      vertices.emplace_back(points[i].x(), points[i].y(), points[i].z());
+    for (const auto & point : points) {
+      vertices.emplace_back(point.x(), point.y(), point.z());
     }
 
     tinyply::PlyFile file;
@@ -30,7 +30,7 @@ namespace RoomCReconstruction {
   }
 
   // Writes points+edges with or without colors, every 2 points form an edge
-  void write3DEdges(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::array<unsigned char, 3>>& colors) {
+  void write3DEdges(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::array<unsigned char, 3>>& colors) {
 
     std::vector<vertex> edge_vertices;
     std::vector<edge_indices> edge_indices;
@@ -58,12 +58,12 @@ namespace RoomCReconstruction {
     standardWrite(filename, file);
   }
 
-  void writePointsWithFaces(const std::string& filename, const std::vector <Eigen::Vector3d> points, const std::vector<std::uint32_t> faceIndices) {
+  void writePointsWithFaces(const std::string& filename, const std::vector <Eigen::Vector3d>& points, const std::vector<std::uint32_t>& faceIndices) {
     std::vector<vertex> vertices;
     std::vector<face_indices> faces;
 
-    for (int i = 0; i < points.size(); i++) {
-      vertices.emplace_back(points[i].x(), points[i].y(), points[i].z());
+    for (const auto & point : points) {
+      vertices.emplace_back(point.x(), point.y(), point.z());
     }
 
     for (int i = 0; i < faceIndices.size(); i += 3) {

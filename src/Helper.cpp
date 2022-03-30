@@ -13,9 +13,9 @@ namespace RoomCReconstruction {
 
 
   std::vector<Eigen::Vector3d> simple2Dto3D(std::vector<Eigen::Vector2d>& points2d) {
-    std::vector<Eigen::Vector3d> points3d;
-    for (int i = 0; i < points2d.size(); i++) {
-      points3d.push_back(Eigen::Vector3d{points2d[i].x(), points2d[i].y(), 0});
+    std::vector<Eigen::Vector3d> points3d(points2d.size());
+    for (auto & pnt : points2d) {
+      points3d.emplace_back(pnt.x(), pnt.y(), 0);
     }
     return points3d;
   }
@@ -40,7 +40,7 @@ namespace RoomCReconstruction {
     const double denominator_x{2.0 * sigma_x * sigma_x};
     const double x_term{delta_x * delta_x / denominator_x};
     return A * std::exp(-(x_term));
-  };
+  }
 
 
   double gaussian_2d(const double x, const double y, const double A, const double x0, const double y0,
@@ -59,10 +59,21 @@ namespace RoomCReconstruction {
   /**
    *  Calculates absolute Distance from vec1 to vec2. Order doesn't matter
    */
-  double calcDistance(Eigen::Vector3d vec1, Eigen::Vector3d vec2) {
+  double calcDistance(const Eigen::Vector3d& vec1, const Eigen::Vector3d& vec2) {
     return (vec2 - vec1).norm();
   }
 
+  /**
+  * Calculates angle between vec1 and vec2
+  */
+  double calcAngle(const Eigen::Vector3d& vec1, const Eigen::Vector3d& vec2) {
+    return acos(vec1.dot(vec2) / (vec1.norm() * vec2.norm()));
+  }
+
+  // Note: Angle between them is smaller than 90 degree.
+  bool vectorsHaveSameDirection(const Eigen::Vector3d& v1, const Eigen::Vector3d& v2) {
+    return v1.dot(v2) > 0;
+  }
 
   Eigen::Vector3d calcPerpendicular(const Eigen::Vector3d& vec) {
     return std::abs(vec[2]) < std::abs(vec[0]) ? Eigen::Vector3d(vec.y(), -vec.x(), 0) : Eigen::Vector3d(0, -vec.z(), vec.y());
@@ -86,11 +97,11 @@ namespace RoomCReconstruction {
 
   bool polygon2dToRoom(std::vector<Eigen::Vector2d>& polygon, double floorlvl, double ceilinglvl, std::vector<Eigen::Vector3d>& out_vertices, std::vector<std::uint32_t>& out_faces) {
 
-    for (int i = 0; i < polygon.size(); i++) {
-      out_vertices.push_back(Eigen::Vector3d{polygon[i].x(), polygon[i].y(), floorlvl});
+    for (auto & pnt : polygon) {
+      out_vertices.emplace_back(pnt.x(), pnt.y(), floorlvl);
     }
-    for (int i = 0; i < polygon.size(); i++) {
-      out_vertices.push_back(Eigen::Vector3d{polygon[i].x(), polygon[i].y(), ceilinglvl});
+    for (auto & pnt : polygon) {
+      out_vertices.emplace_back(pnt.x(), pnt.y(), ceilinglvl);
     }
 
     earClippingPolygon(polygon, out_faces); // Floor
@@ -218,8 +229,8 @@ namespace RoomCReconstruction {
     return a[0] * b[1] - a[1] * b[0];
   }
 
-  void Barycentric(Eigen::Vector2d a, Eigen::Vector2d b, Eigen::Vector2d c,
-                   Eigen::Vector2d p, double &u, double &v, double &w) {
+  void Barycentric(const Eigen::Vector2d& a, const Eigen::Vector2d& b, const Eigen::Vector2d& c,
+                   const Eigen::Vector2d& p, double &u, double &v, double &w) {
     Eigen::Vector2d v0 = b - a, v1 = c - a, v2 = p - a;
     double d00 = v0.dot(v0);
     double d01 = v0.dot(v1);
@@ -244,26 +255,26 @@ namespace RoomCReconstruction {
 
 
 
-std::vector<Eigen::Vector2d> transformPlanePointsTo2D(Eigen::Vector3d center, Eigen::Vector3d normal, const std::vector<Eigen::Vector3d>& pnts, Eigen::Vector3d a1, Eigen::Vector3d a2) {
-  assert (c.normal.dot(a1) > 0.001);
-  assert (c.normal.dot(a2) > 0.001);
+std::vector<Eigen::Vector2d> transformPlanePointsTo2D(const Eigen::Vector3d& center, const Eigen::Vector3d& normal, const std::vector<Eigen::Vector3d>& pnts, const Eigen::Vector3d& a1, const Eigen::Vector3d& a2) {
+  assert (normal.dot(a1) > 0.001);
+  assert (normal.dot(a2) > 0.001);
   //assert (a1.dot(a2) > 0.001);     // Not anymore, also accepts a1 and a2 not orthogonal.
 
   std::vector <Eigen::Vector2d> points2D;
 
-  for (int i = 0; i < pnts.size(); i++) {
+  for (const auto & pnt : pnts) {
     //points2D.emplace_back(Eigen::Vector2d{a1.dot(c.pointsReal[i] - center), a2.dot(c.pointsReal[i] - center)});
     Eigen::Vector3d N = a1.cross(normal);
     Eigen::Vector3d V = center;
     Eigen::Vector3d D = -a2;
-    Eigen::Vector3d P = pnts[i];
+    Eigen::Vector3d P = pnt;
 
     double x_projected = ((V-P).dot(N)) / N.dot(D);
 
     Eigen::Vector3d N2 = a2.cross(normal);
     Eigen::Vector3d V2 = center;
     Eigen::Vector3d D2 = -a1;
-    Eigen::Vector3d P2 = pnts[i];
+    Eigen::Vector3d P2 = pnt;
 
     double y_projected = ((V2-P2).dot(N2)) / N2.dot(D2);
 
