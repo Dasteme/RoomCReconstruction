@@ -185,7 +185,7 @@ public:
         }
       }
 
-      if (possibleMergePoints / toMergeCluster.points.size() >= reqPercent) {
+      if ((double) possibleMergePoints / toMergeCluster.points.size() >= reqPercent) {
         for (int i = 0; i < toMergeCluster.points.size(); i++) {
 
           Add(toMergeCluster.pointsReal[i],
