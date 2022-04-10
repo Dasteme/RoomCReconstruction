@@ -26,11 +26,11 @@ void printArrows(const std::string& filename, double len, bool needLinks, std::v
 
     // Colors: Center is red if inwards, blue if outwards. Last index is triangle index.
     //         Arrow-endpoints contain arrow-index at last position
-    arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+    arrowColors.push_back({static_cast<unsigned char>(t.outwardsKeyarrow==-1 ? 255:i), static_cast<unsigned char>(!t.outwardsKeyarrow==-1 ? 255:i), static_cast<unsigned char>(i)});
     arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(0)});
-    arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+    arrowColors.push_back({static_cast<unsigned char>(t.outwardsKeyarrow==-1 ? 255:i), static_cast<unsigned char>(!t.outwardsKeyarrow==-1 ? 255:i), static_cast<unsigned char>(i)});
     arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(1)});
-    arrowColors.push_back({static_cast<unsigned char>(t.inwardsTriangle ? 255:i), static_cast<unsigned char>(!t.inwardsTriangle ? 255:i), static_cast<unsigned char>(i)});
+    arrowColors.push_back({static_cast<unsigned char>(t.outwardsKeyarrow==-1 ? 255:i), static_cast<unsigned char>(!t.outwardsKeyarrow==-1 ? 255:i), static_cast<unsigned char>(i)});
     arrowColors.push_back({static_cast<unsigned char>(i), static_cast<unsigned char>(i), static_cast<unsigned char>(2)});
   }
   write3DEdges(filename, arrows, arrowColors);
@@ -87,6 +87,17 @@ void printLinkedRoom(const std::string& filename, const LinkedRoom& linkedRoom, 
 
   writePointsWithFaces(filename, vertices_room, faces_room);
 }
+
+void printLinkedRoomAsArrows(const std::string& filename, const LinkedRoom& linkedRoom, std::vector<TriangleNode3D>& intersection_triangles) {
+  std::vector<TriangleNode3D> chosen_intersection_triangles;
+  for (const ClusterPolygon& cp : linkedRoom) {
+    for (int tri : cp.triangles) {
+      chosen_intersection_triangles.push_back(intersection_triangles[tri]);
+    }
+  }
+  printArrows(filename, 0, false, chosen_intersection_triangles);
+}
+
 
 void printMarkerpoints(const std::string& filename, std::vector <Cluster>& clusters) {
   std::vector<Eigen::Vector3d> verticesMarker;

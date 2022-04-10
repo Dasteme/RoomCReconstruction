@@ -6,6 +6,38 @@
 
 namespace RoomCReconstruction {
 
+std::vector<TangentSpace::LocalPCA> computePCAs(const TangentSpace::SearchTree& search_tree, double PCA_dist) {
+
+  // Compute average spacing
+  constexpr std::size_t K_AVG_SPACING = 20;
+  const auto avg_spacing_per_point = TangentSpace::computeAverageSpacingAllPoints(search_tree, K_AVG_SPACING);
+  const auto avg_spacing = avg_spacing_per_point.sum() / static_cast<double>(avg_spacing_per_point.size());
+  const double avg_spacing_sdev{ [&avg_spacing_per_point,
+                                   avg_spacing]() -> double {
+    double sum = 0.0;
+    for (Eigen::Index i = 0; i < avg_spacing_per_point.size(); ++i) {
+      const auto d = avg_spacing_per_point[i] - avg_spacing;
+      sum += (d*d);
+    }
+    return std::sqrt(sum / static_cast<double>(avg_spacing_per_point.size()));
+  }() };
+
+  std::cout << "Min spacing: " << avg_spacing_per_point.minCoeff() << std::endl;
+  std::cout << "Max spacing: " << avg_spacing_per_point.maxCoeff() << std::endl;
+  std::cout << "Average point spacing: " << avg_spacing << std::endl;
+  std::cout << "Points spacing standard deviation: " << avg_spacing_sdev << std::endl;
+
+
+  // Compute PCA
+  std::size_t PCA_K = std::ceil(std::pow(PCA_dist, 2) / std::pow((avg_spacing / 2), 2));
+  std::cout << "using: " << PCA_K << " as PCA_K\n";
+  return TangentSpace::computeLocalPCAAllPoints(
+    search_tree,
+    PCA_K,
+    3.0 * avg_spacing_per_point.cwiseMin(avg_spacing + 2.0 * avg_spacing_sdev), PCA_dist);
+}
+
+
 std::vector <Cluster> generateClusters(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
                                        const std::vector <TangentSpace::LocalPCA> &local_pcas, double req_prop, double max_possible_rec_angle) {
 
@@ -141,7 +173,7 @@ void sortClusters(std::vector <Cluster>& clusters) {
 void mergeClusters(std::vector <Cluster>& clusters, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points, double max_possible_rec_angle) {
 
   std::vector<MergingReq> mergingQueue = {{max_possible_rec_angle, 0.08, 0, 0.3},                // Merges close similar clusters
-                                          {4, 0.1, 0.7, 0.5},                     // Merges unplanar regions to a plane, like curtains
+                                          {4, 0.1, 0.8, 0.5},                     // Merges unplanar regions to a plane, like curtains
                                           {max_possible_rec_angle/2, 0.1, 0, -1}   // Merges distant clusters belonging to the same wall.
   };                                         // Need to be quite exact, otherwise we are possibly going to merge wall+furniture, slightly change the walls normal and then arrow-finding is less exact and may even get wrong arrows
 

@@ -8,6 +8,14 @@
 
 namespace RoomCReconstruction {
 
+/**
+ * Cluster is representative for a plane and some points of the point cloud that
+ * belong to the plane.
+ * The plane (given as center and normal) is restricted to a particular area given with the
+ * "markerPoints". With this, it is possible to have two clusters that lie in the same plane.
+ * (Note that in the algorithm, those clusters are later merged together (after all other merges))
+ *
+ */
 class Cluster
 {
 public:
@@ -61,6 +69,9 @@ public:
     return dist_param <= 0.5;
   }
 
+  // Note: The angle is represented as a fraction of PI for easier usage
+  //       For example, if the angle is PI / 4, angle_frac will be 4.
+  //       Here it is converted back, i.e. this method receives for example 4 and converts it back to PI / 4.
   bool checkAdd(const Eigen::Vector3d& point,
                 const Eigen::Vector3d& pointNormal,
                 double dist,

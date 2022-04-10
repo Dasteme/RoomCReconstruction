@@ -95,6 +95,14 @@ namespace RoomCReconstruction {
     v1.insert(v1.end(), v2.begin(), v2.end());
   }
 
+  /*std::vector<Eigen::Vector3d> transformEigenmatrixToVector(const Eigen::Matrix<double, 3, Eigen::Dynamic>& pointMatrix) {
+    std::vector<Eigen::Vector3d> res;
+    for (int i = 0; i < pointMatrix.cols(); i++) {
+      res.emplace_back(pointMatrix.col(static_cast<Eigen::Index>(i)));
+    }
+    return res;
+  }*/
+
   bool polygon2dToRoom(std::vector<Eigen::Vector2d>& polygon, double floorlvl, double ceilinglvl, std::vector<Eigen::Vector3d>& out_vertices, std::vector<std::uint32_t>& out_faces) {
 
     for (auto & pnt : polygon) {

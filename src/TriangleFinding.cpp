@@ -32,9 +32,9 @@ std::vector<TriangleNode3D> generateTriangles(std::vector<Cluster> clusters, con
         TriangleAttempt ta(k, i, j);
 
         // For debugging
-        if (k == 0 && i == 7 && j == 11) {
+        /*if (k == 0 && i == 1 && j == 2) {
           ta.debugIt = true;
-        }
+        }*/
 
 
         ta.computeIt(bb, clusters);
@@ -52,7 +52,7 @@ std::vector<TriangleNode3D> generateTriangles(std::vector<Cluster> clusters, con
           {(std::abs(ta.best_a1))*arrowPiecesSize,
            (std::abs(ta.best_a2))*arrowPiecesSize,
            (std::abs(ta.best_a3))*arrowPiecesSize},
-          ta.bestIsInwards,
+          ta.outwardsKeyarrow,
           ta.best_score));
 
       }

@@ -33,6 +33,15 @@ using LinkedRoom = std::vector<ClusterPolygon>;
 
 static int vid_counter = 0;
 
+/**
+ * TriangleNode3D represents a triangle, but has also the functionality to find followers (neighbors)
+ * and recursively link the triangles.
+ * It is called 3D because the linking works in 3 dimensions and can be seen as
+ * a "multi-dimensional" graph (graph-theory)
+ * A former algorithm worked in 2-dimensions on a single cluster, and the linking there could be transformed
+ * to a "normal" graph in 2 dimensions.
+ *
+ */
 class TriangleNode3D {
 public:
 
@@ -58,7 +67,7 @@ public:
 
   std::array<double, 3> suggestedLengths;
 
-  bool inwardsTriangle;
+  int outwardsKeyarrow;
   double score;
 
   TriangleNode3D(int idxC1_p,
@@ -67,8 +76,8 @@ public:
                  Eigen::Vector3d corner_p,
                  std::array<Eigen::Vector3d, 3> arrows_p,
                  std::array<double, 3> suggestedLengths_p,
-                 bool inwardsTriangle_p,
-                 double score_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(std::move(corner_p)),arrows(std::move(arrows_p)),suggestedLengths(suggestedLengths_p),inwardsTriangle(inwardsTriangle_p),score(score_p)
+                 int outwardsKeyarrow_p,
+                 double score_p): idxC1(idxC1_p),idxC2(idxC2_p),idxC3(idxC3_p),corner(std::move(corner_p)),arrows(std::move(arrows_p)),suggestedLengths(suggestedLengths_p),outwardsKeyarrow(outwardsKeyarrow_p),score(score_p)
   {
     possibilites = {std::vector<ExtStr2>(), std::vector<ExtStr2>(), std::vector<ExtStr2>()};
     chosen = {-1, -1, -1};
@@ -261,6 +270,9 @@ public:
                                            + (t.arrows[followingArrayIdx]*t.suggestedLengths[followingArrayIdx]);
               double inventedLen = vectorsHaveSameDirection(this->arrows[myArrowIdx], difference) ? difference.norm():0;
 
+              // If this is an outwards-triangle, allow only outwards triangles on the outwardsKeyarrow
+              if (outwardsKeyarrow == myArrowIdx && t.outwardsKeyarrow != followingArrayIdx) continue;
+
               possibilites[myArrowIdx].push_back({myIdx, i, (t.corner - this->corner).norm(), inventedLen, myArrowIdx, followingArrayIdx});
             }
           } else {
@@ -440,12 +452,12 @@ public:
       for (int j = 0; j < possibilites[i].size(); j++) {
         if (allTriangles[possibilites[i][j].opposingTriangle].isInvalid()) continue;
         printExtStr2(possibilites[i][j]);
-        if (j != possibilites[i].size()-1) {std::cout << ",";} else {std::cout << "]";}
+        if (j != possibilites[i].size()-1) {std::cout << ",";}
       }
-      std::cout << ", ";
+      std::cout << "], ";
     }
 
-    std::cout << "}\n";
+    std::cout << "}, outwka: " << outwardsKeyarrow << "\n";
   }
   static void printExtStr2(ExtStr2 es) {
     std::cout << es.myTriangle << "<->" << es.opposingTriangle << "|" << es.dist;

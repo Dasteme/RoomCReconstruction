@@ -21,7 +21,22 @@ constexpr double allow_early_quit_after = 1.0 / arrowPiecesSize;  // Increses th
 
 
 
-
+/**
+ * TriangleAttempt is responsible for checking whether the intersection of 3 clusters is a triangle.
+ * A triangle has 3 clear defined vectors (called "arrows") that define the extension of the wall.
+ * So the main purpose of TriangleAttempt is to intersect the 3 clusters, calculate the 3 intersection-lines
+ * and, most importantly, define the sign of the intersection-vectors.
+ *
+ * During the calculations of the sign, other important attributes are computed:
+ *  - best_score:       score of the triangle
+ *                       1 if the 3 surfaces spanned by the 3 arrows are fully supported by points
+ *                      -1 if the 3 surfaces contain no points at all.
+ *  - best_a1, a2, a3:  suggested lengths for the arrows
+ *  - bestIsInwards:    If the found triangle is "inwards" ("normal" corner)
+ *                      In the other case, the occupation between two arrows may be 0 (between the smaller angle),
+ *                      but there is some occupation between the bigger angle (> 180 degree).
+ *
+ */
 class TriangleAttempt
 {
 public:
@@ -30,7 +45,7 @@ public:
   int best_a1 = 0;
   int best_a2 = 0;
   int best_a3 = 0;
-  bool bestIsInwards = false;
+  int outwardsKeyarrow = -1;
   Eigen::Vector3d cornerPoint;
   Eigen::Vector3d edgeLine1;
   Eigen::Vector3d edgeLine2;
@@ -217,6 +232,21 @@ public:
     }
   }
 
+  /**
+   * Iterates over "distance" away from the center.
+   * For each distance, it tries out all combinations of the arrows with this distance.
+   *
+   * The idea is that first the x-axis has the full distance and y- abd z-axis are iterated
+   * over all possibilites (may be smaller than the full dist)
+   * Then the y-axis has the full distance and x- and z-axis are iterated. Note that the x-axis
+   * should not reach the full distance because those special cases are already handeled in the first iteration.
+   * Then the z-axis has the full distance and x- and y-axis are iterated. Note that this time, both x- and y-axis
+   * should not reach the full distance.
+   *
+   * Visually, it can be seen as a growing cube placed in the center with side-lengths "dist*2".
+   * Every iteration over dist increases the cube-size and adds a new layer to the cube uusing
+   * "surfaceIterator".
+   */
   void distIteration() {
     for (int dist = 0; dist <= getMax_maxNPA(max_npA); dist = specialArrowDecInc(dist)) {
       // Calculate all possible rectangles with this distance.
@@ -247,6 +277,11 @@ public:
     }
   }
 
+  /**
+   * This function is a part of the special iteration "distIteration".
+   * It is called surface-iteration because it can be seen as iterating
+   * over a part of the surface of a cube.
+   */
   static void surfaceIterator(int dist1, int dist2, int dir1_min, int dir1_max, int dir2_min, int dir2_max, const std::function<void(int, int)>& cb) {
     for (int a2_it = -std::min(dist1, dir1_min); a2_it <= std::min(dist1, dir1_max); a2_it = specialArrowDecInc(a2_it)) {
       if (a2_it == 0) continue;
@@ -259,6 +294,11 @@ public:
 
 
 
+  /**
+   * This function gets 3 arrow-lengths as input and checks whether it is better than the
+   * current arrow-lengths we already tested.
+   * If it is, the score and other variables are updated.
+   */
   void computeArrowCombiOcc (int a1_i,
                              int a2_i,
                              int a3_i) {
@@ -280,7 +320,7 @@ public:
 
 
     double least_occ;
-    bool inwards;
+    int outwardsKA;
 
     if (C1_occup == 0 && C2_occup >= 0.3 && C3_occup >= 0.3) {
       double C1_revOcc = computeOccupationReversedSimplifier(a1_i, a2_i, 0, minForC1_revOcc);
@@ -288,7 +328,7 @@ public:
       if (C1_revOcc <= 0.3) return;
 
       least_occ = std::min(std::min(C1_revOcc, C2_occup), C3_occup);
-      inwards = false;
+      outwardsKA = 2;
 
     } else if (C1_occup >= 0.3 && C2_occup == 0 && C3_occup >= 0.3) {
       double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, minForC2_revOcc);
@@ -296,14 +336,14 @@ public:
       if (C2_revOcc <= 0.3) return;
 
       least_occ = std::min(std::min(C1_occup, C2_revOcc), C3_occup);
-      inwards = false;
+      outwardsKA = 1;
     } else if (C1_occup >= 0.3 && C2_occup >= 0.3 && C3_occup == 0) {
       double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, minForC3_revOcc);
 
       if (C3_revOcc <= 0.3) return;
 
       least_occ = std::min(std::min(C1_occup, C2_occup), C3_revOcc);
-      inwards = false;
+      outwardsKA = 0;
     } else if (C1_occup >= min_inw_occ && C2_occup >= min_inw_occ && C3_occup >= min_inw_occ) {
       least_occ = std::min(std::min(C1_occup, C2_occup), C3_occup);
 
@@ -314,7 +354,7 @@ public:
 
       if (C1_revOcc > 0.2 || C2_revOcc > 0.2 || C3_revOcc > 0.2) return;
 
-      inwards = true;
+      outwardsKA = -1;
     } else return;
 
 
@@ -324,10 +364,10 @@ public:
       best_a2 = a2_i;
       best_a3 = a3_i;
       best_score = score;
-      bestIsInwards = inwards;
+      outwardsKeyarrow = outwardsKA;
 
       if (debugIt) {
-        std::cout << "Found new score: score: " << score << "arrows: " << best_a1 << "," << best_a2 << "," << best_a3 << "\n";
+        std::cout << "Found new score: score: " << score << "arrows: " << best_a1 << "," << best_a2 << "," << best_a3 << ", outwardska: " << outwardsKeyarrow << "\n";
         //std::cout << "occupations: " << C1_occup << "," << C2_occup << "," << C3_occup << "\n";
         //std::cout << "occupations_from_to: " << C1_occup << "," << C2_occup << "," << C3_occup << "\n";
       }

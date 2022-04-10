@@ -647,3 +647,32 @@ From rcr_io.hpp
   void createPlanarRoom(const std::string& filename, const std::vector <std::vector <Eigen::Vector3d>> intersectionsPoints);
   std::array<face_indices, 2> getFaces(std::vector <Eigen::Vector3d> points);
   std::vector<face_indices> getFacesConvexPolygon(std::vector <Eigen::Vector3d> points);
+
+
+
+
+
+
+
+
+
+
+
+
+  Old code for PCA radius
+
+      //PCA area requirement calculation (experiment)
+      constexpr double maxWalllength = 100; // User input, estimation of maximum occurring wallength.
+      constexpr double maxWallerror = 0.8; // User input, estimation of wallerror. wallerror = Wall-roughness + scanner-error
+      constexpr double minDistBetweenWalls = 5; // User input, estimation of minimum distance between two walls facing in the same direction.
+
+      /*double requiredPCARadius = maxWalllength * maxWallerror / minDistBetweenWalls;
+      double areaBig = std::numbers::pi_v<double> * requiredPCARadius*requiredPCARadius;
+      double areaSmall = std::numbers::pi_v<double> * avg_spacing * avg_spacing;
+      double numberOfPoints = areaBig / areaSmall;
+      std::cout << "MaxRadius " << requiredPCARadius;
+      std::cout << "Required Points: " << numberOfPoints;*/
+      /*Eigen::VectorXd maxRadiusVector(avg_spacing_per_point.size());
+      for (int i = 0; i < avg_spacing_per_point.size(); i++) {
+        maxRadiusVector[i] = areaBig;
+      }*/

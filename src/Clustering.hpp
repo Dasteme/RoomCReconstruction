@@ -19,7 +19,7 @@ struct MergingReq {
   double requireCloseness;
 };
 
-
+std::vector<TangentSpace::LocalPCA> computePCAs(const TangentSpace::SearchTree& search_tree, double PCA_dist);
 std::vector <Cluster> generateClusters(const TangentSpace::SearchTree &search_tree, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points,
                                        const std::vector <TangentSpace::LocalPCA> &local_pcas, double req_prop, double max_possible_rec_angle);
 void sortClusters(std::vector <Cluster>& clusters);

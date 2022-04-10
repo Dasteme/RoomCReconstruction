@@ -17,6 +17,9 @@ void printPointsWRTClusters(const std::string& filename,
                             const std::vector <Cluster>& clusters);
 void printLinkedRoom(const std::string& filename, const LinkedRoom& linkedRoom, std::vector <Cluster>& clusters, std::vector<TriangleNode3D>& intersection_triangles);
 
+void printLinkedRoomAsArrows(const std::string& filename, const LinkedRoom& linkedRoom, std::vector<TriangleNode3D>& intersection_triangles);
+
+
 void printMarkerpoints(const std::string& filename, std::vector <Cluster>& clusters);
 
 void consoleTriangles(std::vector<TriangleNode3D>& intersection_triangles, bool excludeInvalid);

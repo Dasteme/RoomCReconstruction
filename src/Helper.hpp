@@ -31,6 +31,8 @@ namespace RoomCReconstruction {
   void printMyVec2d(const Eigen::Vector2d& vec);
   void appendVerticesFaces(std::vector<Eigen::Vector3d>& v1, std::vector<std::uint32_t>& f1, std::vector<Eigen::Vector3d>& v2, std::vector<std::uint32_t>& f2);
 
+  //std::vector<Eigen::Vector3d> transformEigenmatrixToVector(const Eigen::Matrix<double, 3, Eigen::Dynamic>& pointMatrix);
+
   bool polygon2dToRoom(std::vector<Eigen::Vector2d>& polygon, double floorlvl, double ceilinglvl, std::vector<Eigen::Vector3d>& out_vertices, std::vector<std::uint32_t>& out_faces);
   bool earClippingPolygon(std::vector<Eigen::Vector2d>& polygon, std::vector<std::uint32_t>& face_indices);
   double computePolygonArea(const std::vector<Eigen::Vector2d>& vertices);
