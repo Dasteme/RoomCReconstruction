@@ -12,7 +12,8 @@
 
 namespace RoomCReconstruction {
 
-struct MergingReq {
+struct MergingTicket
+{
   double angleFracMerging;
   double distMerging;
   double reqPoints;
@@ -26,6 +27,7 @@ void sortClusters(std::vector <Cluster>& clusters);
 void mergeClusters(std::vector <Cluster>& clusters, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points, double max_possible_rec_angle);
 void removeSmallClusters(std::vector <Cluster>& clusters);
 void changeClusterColorsAccordingToIndices(std::vector <Cluster>& clusters);
+void changeClusterColorsToBeSeparate(std::vector <Cluster>& clusters);
 void changeClusterColorsSpecifically(std::vector <Cluster>& clusters);
 
 }

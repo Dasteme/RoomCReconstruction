@@ -6,6 +6,8 @@
 
 namespace RoomCReconstruction {
 
+constexpr bool console_foundTriangles = true;
+
 std::vector<TriangleNode3D> generateTriangles(std::vector<Cluster> clusters, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points) {
 
   BoundingBox bb;
@@ -23,18 +25,18 @@ std::vector<TriangleNode3D> generateTriangles(std::vector<Cluster> clusters, con
 
   for (int k = 0; k < clusters.size(); k++) {
     for (int i = k+1; i < clusters.size(); i++) {
-      if (!checkSomewhatOrthogonal(clusters[k], clusters[i])) continue;
+      if (!checkSomewhatOrthogonal(clusters[k], clusters[i])) {continue;}
 
       for (int j = i + 1; j < clusters.size(); j++) {
-        if (!checkSomewhatOrthogonal(clusters[k], clusters[j])) continue;
-        if (!checkSomewhatOrthogonal(clusters[i], clusters[j])) continue;
+        if (!checkSomewhatOrthogonal(clusters[k], clusters[j])) {continue;}
+        if (!checkSomewhatOrthogonal(clusters[i], clusters[j])) {continue;}
 
         TriangleAttempt ta(k, i, j);
 
         // For debugging
-        /*if (k == 0 && i == 1 && j == 2) {
+        if (k == 0 && i == 2 && j == 3) {
           ta.debugIt = true;
-        }*/
+        }
 
 
         ta.computeIt(bb, clusters);
@@ -44,7 +46,7 @@ std::vector<TriangleNode3D> generateTriangles(std::vector<Cluster> clusters, con
         if (!ta.isSuccess()) continue;
 
 
-        std::cout << "Found Arrow: " << k << "," << i << "," << j << ", idx: " << intersection_triangles.size() << "\n";
+        if constexpr(console_foundTriangles) {std::cout << "Found Arrow: " << k << "," << i << "," << j << ", idx: " << intersection_triangles.size() << "\n";}
 
         intersection_triangles.push_back(TriangleNode3D(
           k, i, j, ta.cornerPoint,
@@ -73,14 +75,15 @@ bool checkSomewhatOrthogonal(Cluster c1, Cluster c2) {
   Eigen::Vector3d currentNormal = c1.normal;
   double angle = safe_acos(c2.normal.dot(currentNormal) /
                            (c2.normal.norm() * currentNormal.norm()));
-  double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 16);
+  double gaussian_angle = gaussian_1d(angle, 1.0, 0.0, std::numbers::pi_v<double> / 4);
 
   Eigen::Vector3d currentNormal2 = -c1.normal;
   double angle2 = safe_acos(c2.normal.dot(currentNormal2) /
                             (c2.normal.norm() * currentNormal2.norm()));
-  double gaussian_angle2 = gaussian_1d(angle2, 1.0, 0.0, std::numbers::pi_v<double> / 16);
+  double gaussian_angle2 = gaussian_1d(angle2, 1.0, 0.0, std::numbers::pi_v<double> / 4);
 
-  return !(gaussian_angle > 0.6) && !(gaussian_angle2 > 0.6);
+  return !(angle < (std::numbers::pi_v<double> / 16) || angle2 < (std::numbers::pi_v<double> / 16));
+  //return !(gaussian_angle > 0.6) && !(gaussian_angle2 > 0.6);
 }
 
 }

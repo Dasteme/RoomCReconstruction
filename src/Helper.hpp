@@ -19,7 +19,10 @@ namespace RoomCReconstruction {
     double maxZ = std::numeric_limits<double>::min();
   };
 
-  std::vector<Eigen::Vector3d> simple2Dto3D(std::vector<Eigen::Vector2d>& points2d);
+  std::array<unsigned char, 3> createColor(double hue);
+  std::array<unsigned char, 3> randColor();
+  std::array<unsigned char, 3> HSLToRGB(std::array<double, 3> hsl);
+  std::vector<Eigen::Vector3d> simple2Dto3D(const std::vector<Eigen::Vector2d>& points2d);
   double safe_acos(double value);
   double gaussian_1d(const double x, const double A, const double x0, const double sigma_x);
   double gaussian_2d(const double x, const double y, const double A, const double x0, const double y0, const double sigma_x, const double sigma_y);

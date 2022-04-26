@@ -11,10 +11,41 @@
 
 namespace RoomCReconstruction {
 
+std::array<unsigned char, 3> createColor(double hue) {
+  std::array<double, 4> vValues = {0.4, 0.5, 0.6, 0.7};
+  std::array<double, 3> hsl = {hue, 0.65, vValues[rand() % 4]};
+  return HSLToRGB(hsl);
+}
+std::array<unsigned char, 3> randColor() {
+    std::array<double, 4> vValues = {0.4, 0.5, 0.6, 0.7};
+    std::array<double, 3> hsl = {static_cast<double>(rand() % 360), 0.65, vValues[rand() % 4]};
+    return HSLToRGB(hsl);
+  }
+  std::array<unsigned char, 3> HSLToRGB(std::array<double, 3> hsl) {
+    std::array<double, 3> rgb = {0, 0, 0};
 
-  std::vector<Eigen::Vector3d> simple2Dto3D(std::vector<Eigen::Vector2d>& points2d) {
-    std::vector<Eigen::Vector3d> points3d(points2d.size());
-    for (auto & pnt : points2d) {
+    double c = (1 - std::abs(2*hsl[2] - 1)) * hsl[1];
+    double x = c * (1 - std::abs(std::fmod(hsl[0]/60, 2.0) - 1));
+    double m = hsl[2] - c/2;
+
+    if (hsl[0] < 60) {rgb = {c, x, 0};}
+    else if (hsl[0] < 120) {rgb = {x, c, 0};}
+    else if (hsl[0] < 180) {rgb = {0, c, x};}
+    else if (hsl[0] < 240) {rgb = {0, x, c};}
+    else if (hsl[0] < 300) {rgb = {x, 0, c};}
+    else {rgb = {c, 0, x};}
+
+    rgb[0] = std::floor((rgb[0] + m) * 255);
+    rgb[1] = std::floor((rgb[1] + m) * 255);
+    rgb[2] = std::floor((rgb[2] + m) * 255);
+
+    return {static_cast<unsigned char>(rgb[0]), static_cast<unsigned char>(rgb[1]), static_cast<unsigned char>(rgb[2])};
+  }
+
+
+  std::vector<Eigen::Vector3d> simple2Dto3D(const std::vector<Eigen::Vector2d>& points2d) {
+    std::vector<Eigen::Vector3d> points3d;
+    for (const auto & pnt : points2d) {
       points3d.emplace_back(pnt.x(), pnt.y(), 0);
     }
     return points3d;
@@ -141,7 +172,7 @@ namespace RoomCReconstruction {
   /*
    * Triangulates the polygon.
    * Works only if the edges of the polygon don't intersect.
-   *§
+   *
    * polygon: Vertices of the polygon. polygon[0] is linked to polygon[1], and so on.
    *          The last vertex is linked to the first one to get a closed polygon-line
    *
@@ -152,6 +183,8 @@ namespace RoomCReconstruction {
    */
   bool earClippingPolygon(std::vector<Eigen::Vector2d>& polygon, std::vector<std::uint32_t>& face_indices) {
 
+    //std::cout << "Starting earclipping on" << polygon.size() << " points\n";
+
     if (polygon.size() < 3) { return false; }
 
     // Reverse if polygon is not in right order
@@ -159,6 +192,7 @@ namespace RoomCReconstruction {
     if (computePolygonArea(polygon) < 0) {
       //std::reverse(polygon.begin(), polygon.end());
       reversed = true;
+      //std::cout << "reversed!\n";
     }
 
     std::vector<std::uint32_t> indexList;
@@ -166,14 +200,14 @@ namespace RoomCReconstruction {
       indexList.push_back(i);
     }
 
-
-    while (indexList.size() > 3) {
+    int infinityObserver = 0;
+    while (indexList.size() > 3 && infinityObserver++ < 1000) {
       for (int i = 0; i < indexList.size(); i++) {
         std::uint32_t a = indexList[i];
         std::uint32_t b = indexList[getCircularIndex(indexList.size(), reversed ? i+1:i-1)];
         std::uint32_t c = indexList[getCircularIndex(indexList.size(), reversed ? i-1:i+1)];
 
-        //std::cout << a << ", " << b << ", " << c;
+        //std::cout << a << ", " << b << ", " << c << "\n";
 
         Eigen::Vector2d va = polygon[a];
         Eigen::Vector2d vb = polygon[b];
@@ -184,7 +218,7 @@ namespace RoomCReconstruction {
 
         // Test wheter angle is convex
         if (cross2d(v_a_to_b, v_a_to_c) < 0) {
-          std::cout << "angle not convex";
+          //std::cout << "angle not convex";
           continue;
         }
 
@@ -204,15 +238,20 @@ namespace RoomCReconstruction {
         face_indices.push_back(a);
         face_indices.push_back(c);
 
+        //std::cout << "Found Tri:" << b << ", " << a << ", " << c << "\n";
+
         indexList.erase(indexList.begin() + i);
         break;
       }
     }
+    if (infinityObserver >= 1000) return false;
 
     face_indices.push_back(indexList[0]);
     face_indices.push_back(indexList[1]);
     face_indices.push_back(indexList[2]);
 
+
+    //std::cout << "Finishing earclipping on" << polygon.size() << " points\n";
     return true;
   }
 

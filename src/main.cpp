@@ -1,6 +1,7 @@
 #include "Clustering.hpp"
 #include "SpecialPrinter.hpp"
 #include "TriangleFinding.hpp"
+#include "Helper.hpp"
 
 #include "tinyply/tinyply.hpp"
 
@@ -8,6 +9,8 @@
 #include <iostream>
 
 using namespace RoomCReconstruction;
+
+constexpr bool consoleTrianglesResult = true;
 
 int main(int argc, const char* argv[]) {
 
@@ -83,6 +86,8 @@ int main(int argc, const char* argv[]) {
     // Generate clusters
     time_measure = std::chrono::high_resolution_clock::now();
     std::vector <Cluster> clusters = generateClusters(search_tree, loaded_points, local_pcas, planarScoreTH, max_possible_rec_angle);
+    std::cout << "Clusters generated in: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl;
+
     std::cout << "Found " << clusters.size() << " Clusters\n";
     printPointsWRTClusters("output_1_initial.ply", loaded_points, clusters);
 
@@ -90,7 +95,10 @@ int main(int argc, const char* argv[]) {
     sortClusters(clusters);
 
     // Merge clusters to put similar clusters together
+    time_measure = std::chrono::high_resolution_clock::now();
     mergeClusters(clusters, loaded_points, max_possible_rec_angle);
+    std::cout << "Clusters merged in: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl;
+
     std::cout << clusters.size() << " Clusters after merging\n";
     printPointsWRTClusters("output_2_after_merging.ply", loaded_points, clusters);
 
@@ -107,9 +115,8 @@ int main(int argc, const char* argv[]) {
     changeClusterColorsSpecifically(clusters);
     printPointsWRTClusters("output_clustering_DEBUG_KEYCLUSTER.ply", loaded_points, clusters);*/
 
-
-    std::cout << "Clusters generated in: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl;
-
+    changeClusterColorsToBeSeparate(clusters);
+    printPointsWRTClusters("output_4_MostSeparateColors.ply", loaded_points, clusters);
 
 
     // ****************************************
@@ -118,7 +125,6 @@ int main(int argc, const char* argv[]) {
     time_measure = std::chrono::high_resolution_clock::now();
 
     std::vector<TriangleNode3D> intersection_triangles = generateTriangles(clusters, loaded_points);
-
     printArrows("output_6_arrows.ply", 0, false, intersection_triangles);
     printArrows("output_6.5_arrows_small.ply", 0.1, false, intersection_triangles);
 
@@ -135,11 +141,10 @@ int main(int argc, const char* argv[]) {
     setupLinks(intersection_triangles);
     printArrows("output_7_arrows_linked.ply", 0, true, intersection_triangles);
     printArrows("output_7.5_arrows_linked_small.ply", 0.1, true, intersection_triangles);
-    consoleTriangles(intersection_triangles, false);
+    if (consoleTrianglesResult) {consoleTriangles(intersection_triangles, false);}
 
     // Link the triangles and return first result
     LinkedRoom room = linkTriangles(clusters, intersection_triangles);
-
     std::cout << "Triangles linked in: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - time_measure) << std::endl;
 
 

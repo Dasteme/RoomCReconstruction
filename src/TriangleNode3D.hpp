@@ -8,6 +8,9 @@
 
 namespace RoomCReconstruction {
 
+constexpr bool console_recursion = true;
+constexpr bool console_buildPolygons = false;
+
 struct ModifiactionElement {
   int trianlgeIdx;
   int chosenIdx;
@@ -102,48 +105,68 @@ public:
 
     // Iterate over all 3 arrows and look for the 3 next cornerpoints stored in "chosen".
     for (int i = 0; i < 3; i++) {
-      printDepthIndent(depth);
-      std::cout << "CurrIdx:" << myIndex << ", " << chosen[0] << "/" << possibilites[0].size() << ", "
-                << chosen[1] << "/" << possibilites[1].size() << ", "
-                << chosen[2] << "/" << possibilites[2].size() << "\n";
+      if constexpr (console_recursion) {
+        printDepthIndent(depth);
+        std::cout << "CurrIdx:" << myIndex << ", " << chosen[0] << "/" << possibilites[0].size() << ", "
+                  << chosen[1] << "/" << possibilites[1].size() << ", "
+                  << chosen[2] << "/" << possibilites[2].size() << "\n";
+      }
+
 
       if (chosen[i] == -1) {
 
         bool found = false;
         bool collision = false;
         for (int j = 0; j < possibilites[i].size(); j++) {
+          if constexpr (console_recursion) {
+            printDepthIndent(depth);
+            std::cout << "now j: " << j << " / " << possibilites[i].size() << "\n";
+          }
+          if (allTriangles[possibilites[i][j].opposingTriangle].isInvalid()) continue;
           if (!allowPastLimit && possibilites[i][j].dist > arrowLimits[i]) continue;
-          int res = checkPossibility(i, j, myModifications[i], allTriangles, depth, false);
+          //if (allowPastLimit && possibilites[i][j].dist <= arrowLimits[i]) continue;  // Now we may look for past limits. Don't check for triangles before limit because we already checked them. Indreases the speed
+          int res = checkPossibility(i, j, myModifications[i], allTriangles, depth, true);
           if (res == 1) {found = true; break;}
           if (res == 2) {collision = true; break;}
         }
-        if (!collision && !found) {
+        /*if (!collision && !found) {
           printDepthIndent(depth);
           std::cout << "Im " << myIndex << ", my followers didn't find anything for arrow " << i << " and I'm going to allow them now going past the limit.\n";
           for (int j = 0; j < possibilites[i].size(); j++) {
+            std::cout << "disti: " << possibilites[i][j].dist << "\n";
+            if (allTriangles[possibilites[i][j].opposingTriangle].isInvalid()) continue;
             if (!allowPastLimit && possibilites[i][j].dist > arrowLimits[i]) continue;
+            //if (allowPastLimit && possibilites[i][j].dist <= arrowLimits[i]) continue;  // Now we may look for past limits. Don't check for triangles before limit because we already checked them. Indreases the speed
             int res = checkPossibility(i, j, myModifications[i], allTriangles, depth, true);
+            std::cout << "Returnenened!\n";
             if (res == 1) {found = true; break;}
             if (res == 2) {break;}
           }
-        }
+        }*/
 
         if (!found) {
           rollbackMods(allTriangles, myModifications[0]);
           rollbackMods(allTriangles, myModifications[1]);
           rollbackMods(allTriangles, myModifications[2]);
-          printDepthIndent(depth);
-          std::cout << "CurrIdx:" << myIndex << ", ended by all tested / collision";
-          std::cout << "Rolled back " << (myModifications[0].mods.size() + myModifications[1].mods.size() + myModifications[2].mods.size()) << "Mods\n";
+          if constexpr (console_recursion) {
+            printDepthIndent(depth);
+            std::cout << "CurrIdx:" << myIndex << ", ended by all tested / collision";
+            std::cout << "Rolled back "
+                      << (myModifications[0].mods.size() + myModifications[1].mods.size() +
+                          myModifications[2].mods.size())
+                      << "Mods\n";
+          }
           return false;
         }
       }
     }
-
-    printDepthIndent(depth);
-    std::cout << "CurrIdx:" << myIndex << ", We found 3 chosens: " << possibilites[0][chosen[0]].opposingTriangle << ","
-              << possibilites[1][chosen[1]].opposingTriangle << ","
-              << possibilites[2][chosen[2]].opposingTriangle << "\n";
+    if constexpr (console_recursion) {
+      printDepthIndent(depth);
+      std::cout << "CurrIdx:" << myIndex
+                << ", We found 3 chosens: " << possibilites[0][chosen[0]].opposingTriangle << ","
+                << possibilites[1][chosen[1]].opposingTriangle << ","
+                << possibilites[2][chosen[2]].opposingTriangle << "\n";
+    }
 
     res_modific.mods.insert(res_modific.mods.end(), myModifications[0].mods.begin(), myModifications[0].mods.end());
     res_modific.mods.insert(res_modific.mods.end(), myModifications[1].mods.begin(), myModifications[1].mods.end());
@@ -208,15 +231,18 @@ public:
     if (chosenReturn == 1) {return 1;}         // We got an endpoint. Dont follow recursion anymore trough this link
     if (chosenReturn == 2) {return 2;}  // We got a collision. Don't follow recursion and pass error back.
 
-    printDepthIndent(depth);
-    std::cout << "CurrIdx:" << myIndex << ", " << chosen[0] << "/" << possibilites[0].size() << ", "
-              << chosen[1] << "/" << possibilites[1].size() << ", "
-              << chosen[2] << "/" << possibilites[2].size() << "\n";
-
+    if constexpr (console_recursion) {
+      printDepthIndent(depth);
+      std::cout << "CurrIdx:" << myIndex << ", " << chosen[0] << "/" << possibilites[0].size()
+                << ", " << chosen[1] << "/" << possibilites[1].size() << ", " << chosen[2] << "/"
+                << possibilites[2].size() << "\n";
+    }
 
     bool recOk = allTriangles[possibilites[i][chosen[i]].opposingTriangle].recursiveGraphTraversal(allTriangles, depth+1, myModifications, allowPastL);
-    printDepthIndent(depth);
-    std::cout << "Recursion ended with: " << recOk << "\n";
+    if constexpr (console_recursion) {
+      printDepthIndent(depth);
+      std::cout << "Recursion ended with: " << recOk << "\n";
+    }
     if (recOk) {
       return 1;
     } else {
@@ -295,6 +321,11 @@ public:
     const auto comparePoss{[allTriangles](ExtStr2 e1, ExtStr2 e2) -> bool {
       //if (e1.dist > arrowLimits[e1.myArrow] && e2.dist <= arrowLimits[e2.myArrow]) return false; // if e1 is out of limit and e2 is not, prefer e2
       //if (e1.dist <= arrowLimits[e1.myArrow] && e2.dist > arrowLimits[e2.myArrow]) return false; // other way around
+      bool e1OnlyPL = allTriangles[e1.opposingTriangle].hasOneArrowOnlyPastLimitations(allTriangles);
+      bool e2OnlyPL = allTriangles[e2.opposingTriangle].hasOneArrowOnlyPastLimitations(allTriangles);
+
+      if (e1OnlyPL != e2OnlyPL) return e2OnlyPL;  // If e2 has only past limitations, it is worse than e1. e2OnlyPL is true in this case.
+                                                  // This function returns true if e1 is better, so we can just return e2OnlyPL.
 
       if (std::abs(e1.dist - e2.dist) < 0.8) {
         //return e1.dist > e2.dist;
@@ -356,9 +387,25 @@ public:
     return true;
   }
 
-  bool isInvalid() {
+  bool isInvalid() const {
     return possibilites[0].empty() || possibilites[1].empty() || possibilites[2].empty();
   }
+
+  // Not really "invalid", but should definitly have lower priority
+  bool hasOneArrowOnlyPastLimitations(const std::vector<TriangleNode3D>& allTriangles) const {
+    for (int i = 0; i < 3; i++) {
+      bool foundBeforeLimit = false;
+      for (int j = 0; j < possibilites[i].size(); j++) {
+        if (allTriangles[possibilites[i][j].opposingTriangle].isInvalid()) continue;
+        if (possibilites[i][j].dist >= arrowLimits[i]) continue;
+        foundBeforeLimit = true;
+        break;
+      }
+      if (!foundBeforeLimit) return true;
+    }
+    return false;
+  }
+
   bool isEqual(const TriangleNode3D& t) {
     return t.idxC1 == this->idxC1 && t.idxC2 == this->idxC2 && t.idxC3 == this->idxC3;
   }
@@ -369,7 +416,7 @@ public:
 
     for (int idx : {idxC1, idxC2, idxC3}) {
       if (!clusterPolygonsContainCluster(polygons, idx)) {
-        std::cout << "CLGEN: By: " << myIndex << ", ClIdx: " << idx << "\n";
+        if (console_buildPolygons) {std::cout << "CLGEN: By: " << myIndex << ", ClIdx: " << idx << "\n";}
         ClusterPolygon newOne{idx, std::vector<int>()};
         ExtStr2 link = findNextExtStr2Plane(idx, -1);
         iterateOverClusterContour(allTriangles, link, myIndex, idx, newOne, possibleFollowups, dones);
@@ -380,17 +427,19 @@ public:
   }
 
   ExtStr2 findNextExtStr2Plane(int clusterIndex, int comingFrom) {
-    std::cout << "I'm " << myIndex << ", Looking for cluster " << clusterIndex << "\n";
-    std::cout << "MyLinks: ";
-    printExtStr2(possibilites[0][chosen[0]]);
-    std::cout << ",";
-    printExtStr2(possibilites[1][chosen[1]]);
-    std::cout << ",";
-    printExtStr2(possibilites[2][chosen[2]]);
-    std::cout << "chosens: " << chosen[0] << "," << chosen[1] << "," << chosen[2];
-    std::cout << ", Clusters: ";
-    std::cout << idxC1 << "," << idxC2 << "," << idxC3;
-    std::cout << ", from:" << comingFrom << "\n";
+    if (console_buildPolygons) {
+      std::cout << "I'm " << myIndex << ", Looking for cluster " << clusterIndex << "\n";
+      std::cout << "MyLinks: ";
+      printExtStr2(possibilites[0][chosen[0]]);
+      std::cout << ",";
+      printExtStr2(possibilites[1][chosen[1]]);
+      std::cout << ",";
+      printExtStr2(possibilites[2][chosen[2]]);
+      std::cout << "chosens: " << chosen[0] << "," << chosen[1] << "," << chosen[2];
+      std::cout << ", Clusters: ";
+      std::cout << idxC1 << "," << idxC2 << "," << idxC3;
+      std::cout << ", from:" << comingFrom << "\n";
+    }
     if (idxC1 == clusterIndex) {  // arrow1 and arrow2 are constructing this plane
       if (possibilites[0][chosen[0]].opposingTriangle != comingFrom) {
         return possibilites[0][chosen[0]];
@@ -418,12 +467,12 @@ public:
     if (std::find(dones.begin(), dones.end(), myIndex) == dones.end()) {
       possibleFollowups.push(myIndex);
     }
-    std::cout << "SI:" << startIndex << ", CI: " << clusterIndex << ", MyIdx: " << myIndex << ", Link: " << link.myTriangle << "," << link.opposingTriangle << "\n";
+    if (console_buildPolygons) {std::cout << "SI:" << startIndex << ", CI: " << clusterIndex << ", MyIdx: " << myIndex << ", Link: " << link.myTriangle << "," << link.opposingTriangle << "\n";}
     cp.triangles.push_back(allTriangles[link.myTriangle].myIndex);
 
     if (link.opposingTriangle == startIndex) return;
     ExtStr2 nextLink = allTriangles[link.opposingTriangle].findNextExtStr2Plane(clusterIndex, myIndex);
-    std::cout << "NextLink: " << nextLink.myTriangle << "," << nextLink.opposingTriangle << "\n";
+    if (console_buildPolygons) {std::cout << "NextLink: " << nextLink.myTriangle << "," << nextLink.opposingTriangle << "\n";}
 
     allTriangles[link.opposingTriangle].iterateOverClusterContour(allTriangles, nextLink, startIndex, clusterIndex, cp, possibleFollowups, dones);
 
@@ -447,6 +496,7 @@ public:
     printVector3D(corner);
     std::cout << ", ";
     std::cout << "Clusters: " << idxC1 << "," << idxC2 << "," << idxC3 << ", ";
+    std::cout << "hasOAOPL:" << hasOneArrowOnlyPastLimitations(allTriangles) << ", ";
     for (int i = 0; i < 3; i++) {
       std::cout << "poss_" << i << ": [";
       for (int j = 0; j < possibilites[i].size(); j++) {

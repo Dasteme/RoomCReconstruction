@@ -3,8 +3,11 @@
 //
 
 #include "Clustering.hpp"
+#include "Helper.hpp"
 
 namespace RoomCReconstruction {
+
+constexpr bool console_clusterPercent = true;
 
 std::vector<TangentSpace::LocalPCA> computePCAs(const TangentSpace::SearchTree& search_tree, double PCA_dist) {
 
@@ -59,10 +62,12 @@ std::vector <Cluster> generateClusters(const TangentSpace::SearchTree &search_tr
     }
 
     while (!pointQueue.empty()) {
-      if (((double)queuePopped / local_pcas.size()) * 100 >= (debugPercent + 1)) {
-        std::cout << (++debugPercent) << "%, " << clusters.size() << " clusters found\n";
+      if constexpr(console_clusterPercent) {
+        if (((double)queuePopped / local_pcas.size()) * 100 >= (debugPercent + 1)) {
+          std::cout << (++debugPercent) << "%, " << clusters.size() << " clusters found\n";
 
-        //printPointsWRTClusters("./video_A_video_step1_" + formatInteger(queuePopped, 12)  + ".ply", points, clusters, colors);
+          // printPointsWRTClusters("./video_A_video_step1_" + formatInteger(queuePopped, 12)  + ".ply", points, clusters, colors);
+        }
       }
 
       queuePopped++;
@@ -172,9 +177,10 @@ void sortClusters(std::vector <Cluster>& clusters) {
 
 void mergeClusters(std::vector <Cluster>& clusters, const Eigen::Matrix<double, 3, Eigen::Dynamic> &points, double max_possible_rec_angle) {
 
-  std::vector<MergingReq> mergingQueue = {{max_possible_rec_angle, 0.08, 0, 0.3},                // Merges close similar clusters
-                                          {4, 0.1, 0.8, 0.5},                     // Merges unplanar regions to a plane, like curtains
-                                          {max_possible_rec_angle/2, 0.1, 0, -1}   // Merges distant clusters belonging to the same wall.
+  std::vector<MergingTicket> mergingQueue = {{32, 0.02, 0, 0.5},                // Merges close similar clusters
+                                          {32, 0.04, 0, 0.5},
+                                          {4, 0.05, 0.8, 0.5},                     // Merges unplanar regions to a plane, like curtains
+                                          {32, 0.1, 0, -1}   // Merges distant clusters belonging to the same wall.
   };                                         // Need to be quite exact, otherwise we are possibly going to merge wall+furniture, slightly change the walls normal and then arrow-finding is less exact and may even get wrong arrows
 
   for (auto & cluster : clusters) {
@@ -184,7 +190,7 @@ void mergeClusters(std::vector <Cluster>& clusters, const Eigen::Matrix<double, 
   bool stillmerging;
   int video_mergingCounter = 0;
   int videoCounterCluster = 0;
-  for (MergingReq mergReq : mergingQueue) {
+  for (MergingTicket mergReq : mergingQueue) {
     std::cout << "distMerging: " << mergReq.distMerging << "\n";
     std::cout << "angleFracMerging: " << mergReq.angleFracMerging << "\n";
     stillmerging = true;
@@ -241,6 +247,12 @@ void changeClusterColorsAccordingToIndices(std::vector <Cluster>& clusters) {
 
   for (int i = 0; i < clusters.size(); i++) {
     clusters[i].color[2] = i;
+  }
+}
+
+void changeClusterColorsToBeSeparate(std::vector <Cluster>& clusters) {
+  for (int i = 0; i < clusters.size(); i++) {
+    clusters[i].color = createColor((i * 31) % 360);
   }
 }
 

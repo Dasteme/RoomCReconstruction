@@ -11,6 +11,8 @@ namespace RoomCReconstruction {
 void setupLinks(std::vector<TriangleNode3D>& intersection_triangles) {
   for (int jj = 0; jj < intersection_triangles.size(); jj++) {
     intersection_triangles[jj].findPossibleFollowers(intersection_triangles, jj);
+  }
+  for (int jj = 0; jj < intersection_triangles.size(); jj++) {
     intersection_triangles[jj].sortPossibilities(intersection_triangles);
   }
 }

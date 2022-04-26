@@ -352,7 +352,7 @@ public:
       double C2_revOcc = computeOccupationReversedSimplifier(a1_i, a3_i, 1, std::ceil(emptyRequirement / arrowPiecesSize));
       double C3_revOcc = computeOccupationReversedSimplifier(a2_i, a3_i, 2, std::ceil(emptyRequirement / arrowPiecesSize));
 
-      if (C1_revOcc > 0.2 || C2_revOcc > 0.2 || C3_revOcc > 0.2) return;
+      if (C1_revOcc > 0.1 || C2_revOcc > 0.1 || C3_revOcc > 0.1) return;
 
       outwardsKA = -1;
     } else return;
