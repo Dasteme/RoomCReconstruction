@@ -1,7 +1,11 @@
 # RoomCReconstruction
 
-RoomCReconstruction is currently able to cluster connected flat areas of a point cloud.<br>
-The following is planned in the future:
+RoomCReconstruction is a project which is able to reconstruct the planimetry of non-empty rooms.<br>
+For this, it takes a point cloud as input and outputs a mesh.<br>
+It is divided into three steps:<br>
 
- - ignore clusters within the pointcloud, s.t. only the "surface" (i.e. walls of a room) are processed further
- - Transform the point-cloud-walls into clear planes
+ 1. A Clustering algorithm which is able to separate the point cloud into "clusters" (points that lie in the same plane)
+ 2. An algorithm called "triangle-finding" which finds corners in the room.
+ 3. An algorithm called "triangle-linking" which connects the triangles (corners) to a closed room.
+
+The linked triangles are then converted to a mesh.
